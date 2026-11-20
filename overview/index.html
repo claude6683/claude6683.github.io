@@ -55,7 +55,7 @@
   <div id="msg"></div>
   <footer>
     BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
-    차트는 구간 시작을 0%로 맞춰 누가 더 오르고 내렸는지 비교합니다 (1D = 최근 주식 거래일 시작부터). 마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
+    차트는 구간 시작을 0%로 맞춰 누가 더 오르고 내렸는지 비교합니다 (1D = 최근 주식 거래일 시작부터 · 상장이 늦은 종목은 상장일부터 표시 · 장이 닫힌 시간엔 주식 선이 멈춤). 마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
     본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
   </footer>
 </div>
@@ -72,13 +72,14 @@ const ASSETS = [
   {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
 ];
 const TF = {
-  '1D': {b:'5m',  lim:288, sec:300, dyn:true},
-  '2D': {b:'5m',  lim:576, sec:300},
-  '5D': {b:'15m', lim:480, sec:900},
-  '1M': {b:'1h',  lim:720, sec:3600},
-  '6M': {b:'1d',  lim:183, sec:86400, day:true},
-  '1Y': {b:'1d',  lim:365, sec:86400, day:true},
-  '5Y': {b:'1w',  lim:260, sec:604800, day:true},
+  '1H':  {b:'1m',  lim:60,   sec:60,     span:3600,           key:'1H'},
+  '1D':  {b:'5m',  lim:288,  sec:300,    dyn:true,            key:'2D'},
+  '7D':  {b:'30m', lim:336,  sec:1800,   span:7*86400,        key:'7D'},
+  '1M':  {b:'1h',  lim:720,  sec:3600,   span:30*86400,       key:'1M'},
+  '1Y':  {b:'1d',  lim:365,  sec:86400,  span:365*86400,      key:'1Y',  day:true},
+  '5Y':  {b:'1w',  lim:260,  sec:604800, span:5*365*86400,    key:'5Y',  day:true},
+  '10Y': {b:'1w',  lim:522,  sec:604800, span:10*365*86400,   key:'10Y', day:true},
+  '20Y': {b:'1w',  lim:1000, sec:604800, span:40*365*86400,   key:'20Y', day:true},
 };
 let tf = '1D', curCfg = null;
 const raw = {}, series = {}, hidden = {};
@@ -146,7 +147,7 @@ async function fetchStocks(){
   }catch(e){ return false; }
 }
 function stockSeries(k, cfg, startT){
-  const pts = stockData && stockData[tf==='1D'?'2D':tf] && stockData[tf==='1D'?'2D':tf][k];
+  const pts = stockData && stockData[cfg.key] && stockData[cfg.key][k];
   if(!pts) return [];
   return dedupe(pts.map(p=>[bucket(p[0],cfg), p[1]])).filter(p=>p[0]>=startT);
 }
@@ -168,7 +169,7 @@ async function load(){
     const [btc, gold] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
     if(id!==loadId) return;
     raw.BTC = btc; raw.GOLD = gold;
-    const st = btc.length ? btc[0][0] : 0;
+    const st = cfg.dyn ? (btc.length ? btc[0][0] : 0) : Date.now()/1000 - cfg.span;
     ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
     renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
     openWS(cfg);
@@ -184,7 +185,7 @@ function setMsg(){
 }
 setInterval(async ()=>{
   if(await fetchStocks()){
-    const cfg=curCfg, st = raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0;
+    const cfg=curCfg, st = cfg.dyn ? (raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0) : Date.now()/1000 - cfg.span;
     ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
     setMsg();
   }
@@ -234,7 +235,7 @@ function rows(t){
     const arr = raw[a.k]; const pt = t===null ? (arr&&arr.length?arr[arr.length-1]:null) : valueAt(arr,t);
     if(!pt) return {a, none:true};
     const b = arr.length ? baseOf(arr) : pt[1];
-    const stale = t!==null && (t-pt[0] > cfg.sec*4);
+    const stale = t!==null && (t-pt[0] > Math.max(cfg.sec*4,1200));
     const lastV = arr[arr.length-1][1];
     return {a, price:pt[1], pct:(pt[1]/b-1)*100, vsNow:(pt[1]/lastV-1)*100, toNow:(lastV/pt[1]-1)*100, stale};
   });
