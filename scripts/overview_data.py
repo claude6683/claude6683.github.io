@@ -7,12 +7,14 @@ import yfinance as yf
 
 SYMS = ["QQQM", "VOO", "SCHD"]
 RANGES = {
+    "1H": ("1d", "1m"),
     "2D": ("5d", "5m"),
-    "5D": ("5d", "15m"),
+    "7D": ("1mo", "30m"),
     "1M": ("1mo", "60m"),
-    "6M": ("6mo", "1d"),
     "1Y": ("1y", "1d"),
     "5Y": ("5y", "1wk"),
+    "10Y": ("10y", "1wk"),
+    "20Y": ("max", "1wk"),
 }
 
 out = {"updated": int(time.time()), "data": {}}
@@ -22,7 +24,7 @@ for tf, (period, interval) in RANGES.items():
         pts = []
         try:
             df = yf.download(s, period=period, interval=interval,
-                             prepost=interval in ("5m", "15m"),
+                             prepost=interval in ("1m", "5m", "30m"),
                              auto_adjust=False, progress=False)
             if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
