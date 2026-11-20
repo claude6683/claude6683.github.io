@@ -27,9 +27,9 @@
   .up{color:var(--up)} .dn{color:var(--dn)}
   #chartbox{position:relative}
   #chart{height:calc(100vh - 250px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:310px}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:400px}
   #tip .tt{color:var(--sub);margin-bottom:5px}
-  #tip .r{display:grid;grid-template-columns:56px 1fr 88px 70px;gap:8px;white-space:nowrap;align-items:center;line-height:1.7}
+  #tip .r{display:grid;grid-template-columns:56px 1fr 66px 92px 70px;gap:8px;white-space:nowrap;align-items:center;line-height:1.7}
   #tip .r>span:first-child{display:flex;align-items:center;gap:6px}
   #tip .r>span:not(:first-child){text-align:right}
   #tip .h{color:var(--sub);font-size:11px;line-height:1.4;margin-bottom:2px}
@@ -44,7 +44,6 @@
     <h1>overview</h1>
     <div class="grp" id="tfs"></div>
     <div class="sp"></div>
-    <div class="grp" id="modes"></div>
     <div class="grp">
       <button id="zout" title="줌아웃">−</button>
       <button id="zin" title="줌인">+</button>
@@ -56,7 +55,7 @@
   <div id="msg"></div>
   <footer>
     BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
-    마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
+    차트는 구간 시작을 0%로 맞춰 누가 더 오르고 내렸는지 비교합니다 (1D = 최근 주식 거래일 시작부터). 마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
     본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
   </footer>
 </div>
@@ -73,6 +72,7 @@ const ASSETS = [
   {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
 ];
 const TF = {
+  '1D': {b:'5m',  lim:288, sec:300, dyn:true},
   '2D': {b:'5m',  lim:576, sec:300},
   '5D': {b:'15m', lim:480, sec:900},
   '1M': {b:'1h',  lim:720, sec:3600},
@@ -80,7 +80,7 @@ const TF = {
   '1Y': {b:'1d',  lim:365, sec:86400, day:true},
   '5Y': {b:'1w',  lim:260, sec:604800, day:true},
 };
-let tf = '5D', mode = 'now';
+let tf = '1D', curCfg = null;
 const raw = {}, series = {}, hidden = {};
 let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0;
 
@@ -108,14 +108,10 @@ window.addEventListener('resize', fit);
 // ---------- UI ----------
 function buildUI(){
   $('tfs').innerHTML = Object.keys(TF).map(k=>`<button data-tf="${k}" class="${k===tf?'on':''}">${k}</button>`).join('');
-  $('modes').innerHTML =
-    `<button data-m="now" class="${mode==='now'?'on':''}" title="각 종목의 현재(오늘 종가)를 0%로">오늘 종가 기준</button>`+
-    `<button data-m="start" class="${mode==='start'?'on':''}" title="구간 시작을 0%로">구간 시작 기준</button>`;
   $('legend').innerHTML = ASSETS.map(a=>
     `<div class="chip" data-k="${a.k}"><span class="dot" style="background:${a.color}"></span><b>${a.k}</b>${a.base?'<span class="base">기준</span>':''}<span class="pr"></span><span class="pc"></span></div>`).join('');
 }
 $('tfs').addEventListener('click', e=>{ const k=e.target.dataset.tf; if(k&&k!==tf){tf=k; buildUI(); bindChips(); load();} });
-$('modes').addEventListener('click', e=>{ const m=e.target.dataset.m; if(m&&m!==mode){mode=m; buildUI(); bindChips(); renderAll(); chart.timeScale().fitContent(); setLegend(null);} });
 function bindChips(){
   document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     const k=c.dataset.k; if(k==='BTC') return;
@@ -150,16 +146,26 @@ async function fetchStocks(){
   }catch(e){ return false; }
 }
 function stockSeries(k, cfg, startT){
-  const pts = stockData && stockData[tf] && stockData[tf][k];
+  const pts = stockData && stockData[tf==='1D'?'2D':tf] && stockData[tf==='1D'?'2D':tf][k];
   if(!pts) return [];
   return dedupe(pts.map(p=>[bucket(p[0],cfg), p[1]])).filter(p=>p[0]>=startT);
 }
 async function load(){
-  const id = ++loadId, cfg = TF[tf];
+  const id = ++loadId; let cfg = TF[tf];
   $('msg').textContent = '불러오는 중…';
   closeWS();
   try{
-    const [btc, gold] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg), stockData?null:fetchStocks()]);
+    if(!stockData) await fetchStocks();
+    if(cfg.dyn){
+      // 1D: 가장 최근 주식 거래일 시작부터 지금까지 (주말엔 금요일 장 ~ 현재)
+      const now = Date.now()/1000;
+      let lastT = 0;
+      ['QQQM','VOO','SCHD'].forEach(k=>{ const a = stockData&&stockData['2D']&&stockData['2D'][k]; if(a&&a.length) lastT=Math.max(lastT,a[a.length-1][0]); });
+      const startT = (lastT && now-lastT < 5*86400) ? lastT-20*3600 : now-86400;
+      cfg = Object.assign({}, cfg, {lim: Math.min(1000, Math.max(60, Math.ceil((now-startT)/300)+3))});
+    }
+    curCfg = cfg;
+    const [btc, gold] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
     if(id!==loadId) return;
     raw.BTC = btc; raw.GOLD = gold;
     const st = btc.length ? btc[0][0] : 0;
@@ -178,14 +184,14 @@ function setMsg(){
 }
 setInterval(async ()=>{
   if(await fetchStocks()){
-    const cfg=TF[tf], st = raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0;
+    const cfg=curCfg, st = raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0;
     ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
     setMsg();
   }
 }, 60000);
 
 // ---------- render ----------
-function baseOf(arr){ return mode==='now' ? arr[arr.length-1][1] : arr[0][1]; }
+function baseOf(arr){ return arr[0][1]; }  // 차트 기준: 구간 시작 = 0%
 function renderOne(k){
   const arr = raw[k];
   if(!arr || !arr.length){ series[k].setData([]); return; }
@@ -223,14 +229,14 @@ function valueAt(arr, t){
 const fmtP = (k,v)=> v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2);
 const fmtPct = p => (p>=0?'+':'')+p.toFixed(2)+'%';
 function rows(t){
-  const cfg = TF[tf];
+  const cfg = curCfg;
   return ASSETS.map(a=>{
     const arr = raw[a.k]; const pt = t===null ? (arr&&arr.length?arr[arr.length-1]:null) : valueAt(arr,t);
     if(!pt) return {a, none:true};
     const b = arr.length ? baseOf(arr) : pt[1];
     const stale = t!==null && (t-pt[0] > cfg.sec*4);
     const lastV = arr[arr.length-1][1];
-    return {a, price:pt[1], pct:(pt[1]/b-1)*100, toNow:(lastV/pt[1]-1)*100, stale};
+    return {a, price:pt[1], pct:(pt[1]/b-1)*100, vsNow:(pt[1]/lastV-1)*100, toNow:(lastV/pt[1]-1)*100, stale};
   });
 }
 function setLegend(t){
@@ -248,14 +254,13 @@ const tip = $('tip');
 chart.subscribeCrosshairMove(p=>{
   if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ crossOn=false; tip.style.display='none'; setLegend(null); return; }
   crossOn = true;
-  const t = p.time - KST, cfg = TF[tf];
+  const t = p.time - KST, cfg = curCfg;
   const d = new Date(p.time*1000).toISOString();
   const title = cfg.day ? d.slice(0,10) : d.slice(0,10)+' '+d.slice(11,16);
-  const base = mode==='now' ? '오늘 종가 대비' : '구간 시작 대비';
-  tip.innerHTML = `<div class="tt">${title}</div><div class="r h"><span></span><span>가격</span><span>${base}</span><span>이날→오늘</span></div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
+  tip.innerHTML = `<div class="tt">${title}</div><div class="r h"><span></span><span>가격</span><span>시작 대비</span><span>오늘 종가 대비</span><span>이날→오늘</span></div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
     const lab = `<span><i class="dot" style="background:${r.a.color}"></i>${r.a.k}</span>`;
-    if(r.none) return `<div class="r">${lab}<span class="pr">–</span><span></span><span></span></div>`;
-    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span class="pr">${fmtP(r.a.k,r.price)}</span><b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b><b class="${r.toNow>=0?'up':'dn'}">${fmtPct(r.toNow)}</b></div>`;
+    if(r.none) return `<div class="r">${lab}<span class="pr">–</span><span></span><span></span><span></span></div>`;
+    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span class="pr">${fmtP(r.a.k,r.price)}</span><b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b><b class="${r.vsNow>=0?'up':'dn'}">${fmtPct(r.vsNow)}</b><b class="${r.toNow>=0?'up':'dn'}">${fmtPct(r.toNow)}</b></div>`;
   }).join('');
   tip.style.display='block';
   const w = tip.offsetWidth, W = $('chart').clientWidth;
