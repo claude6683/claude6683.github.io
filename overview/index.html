@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>overview · #6683</title>
+<style>
+  :root{--bg:#0f1115;--card:#181b22;--line:#2a2f3a;--tx:#e8eaf0;--sub:#8b93a7;--ac:#4aa3ff;--up:#34d399;--dn:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Malgun Gothic",sans-serif}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px 14px 28px}
+  .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px}
+  .top a{color:var(--sub);text-decoration:none;font-size:14px}
+  h1{font-size:20px;margin:0 8px 0 0}
+  .grp{display:flex;gap:4px;flex-wrap:wrap}
+  button{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-size:13px;cursor:pointer}
+  button.on{border-color:var(--ac);color:var(--ac)}
+  .sp{flex:1}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer;user-select:none}
+  .chip.off{opacity:.35}
+  .chip.stale .pc{opacity:.5}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .chip b{font-weight:600}
+  .chip .base{font-size:10px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:0 5px}
+  .pr{color:var(--sub)}
+  .up{color:var(--up)} .dn{color:var(--dn)}
+  #chartbox{position:relative}
+  #chart{height:calc(100vh - 250px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:190px}
+  #tip .tt{color:var(--sub);margin-bottom:5px}
+  #tip .r{display:flex;justify-content:space-between;gap:14px;line-height:1.7}
+  #tip .r span:first-child{display:flex;align-items:center;gap:6px}
+  #msg{font-size:12px;color:var(--sub);margin-top:8px}
+  footer{margin-top:14px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="../">#6683</a><span style="color:var(--sub)">/</span>
+    <h1>overview</h1>
+    <div class="grp" id="tfs"></div>
+    <div class="sp"></div>
+    <div class="grp" id="modes"></div>
+    <div class="grp">
+      <button id="zout" title="줌아웃">−</button>
+      <button id="zin" title="줌인">+</button>
+      <button id="fit" title="전체 보기">전체</button>
+    </div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div id="chartbox"><div id="chart"></div><div id="tip"></div></div>
+  <div id="msg"></div>
+  <footer>
+    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
+    마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
+    본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+  </footer>
+</div>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function(){
+const KST = 32400;
+const DATA_URL = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/data/data.json';
+const ASSETS = [
+  {k:'BTC',  color:'#f7931a', w:3,   src:'bn', sym:'BTCUSDT', base:true},
+  {k:'QQQM', color:'#4aa3ff', w:1.5, src:'yf'},
+  {k:'VOO',  color:'#a78bfa', w:1.5, src:'yf'},
+  {k:'GOLD', color:'#facc15', w:1.5, src:'bn', sym:'PAXGUSDT'},
+  {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
+];
+const TF = {
+  '2D': {b:'5m',  lim:576, sec:300},
+  '5D': {b:'15m', lim:480, sec:900},
+  '1M': {b:'1h',  lim:720, sec:3600},
+  '6M': {b:'1d',  lim:183, sec:86400, day:true},
+  '1Y': {b:'1d',  lim:365, sec:86400, day:true},
+  '5Y': {b:'1w',  lim:260, sec:604800, day:true},
+};
+let tf = '5D', mode = 'now';
+const raw = {}, series = {}, hidden = {};
+let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0;
+
+const $ = id => document.getElementById(id);
+const chart = LightweightCharts.createChart($('chart'), {
+  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
+  grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
+  rightPriceScale:{borderColor:'#2a2f3a'},
+  timeScale:{borderColor:'#2a2f3a', timeVisible:true, secondsVisible:false, rightOffset:4},
+  crosshair:{mode:0},
+  localization:{priceFormatter:v=>v.toFixed(1)+'%'},
+});
+ASSETS.forEach(a=>{
+  series[a.k] = chart.addLineSeries({
+    color:a.color, lineWidth:a.w, priceLineVisible:false, lastValueVisible:true,
+    crosshairMarkerVisible:true, priceFormat:{type:'custom', formatter:v=>v.toFixed(2)+'%', minMove:0.01},
+  });
+  hidden[a.k] = false;
+});
+series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
+
+function fit(){ chart.resize($('chart').clientWidth, $('chart').clientHeight); }
+window.addEventListener('resize', fit);
+
+// ---------- UI ----------
+function buildUI(){
+  $('tfs').innerHTML = Object.keys(TF).map(k=>`<button data-tf="${k}" class="${k===tf?'on':''}">${k}</button>`).join('');
+  $('modes').innerHTML =
+    `<button data-m="now" class="${mode==='now'?'on':''}" title="각 종목의 현재(오늘 종가)를 0%로">오늘 종가 기준</button>`+
+    `<button data-m="start" class="${mode==='start'?'on':''}" title="구간 시작을 0%로">구간 시작 기준</button>`;
+  $('legend').innerHTML = ASSETS.map(a=>
+    `<div class="chip" data-k="${a.k}"><span class="dot" style="background:${a.color}"></span><b>${a.k}</b>${a.base?'<span class="base">기준</span>':''}<span class="pr"></span><span class="pc"></span></div>`).join('');
+}
+$('tfs').addEventListener('click', e=>{ const k=e.target.dataset.tf; if(k&&k!==tf){tf=k; buildUI(); bindChips(); load();} });
+$('modes').addEventListener('click', e=>{ const m=e.target.dataset.m; if(m&&m!==mode){mode=m; buildUI(); bindChips(); renderAll(); chart.timeScale().fitContent(); setLegend(null);} });
+function bindChips(){
+  document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    const k=c.dataset.k; if(k==='BTC') return;
+    hidden[k]=!hidden[k]; c.classList.toggle('off',hidden[k]); series[k].applyOptions({visible:!hidden[k]});
+  });
+}
+$('fit').onclick = ()=>chart.timeScale().fitContent();
+function zoom(f){
+  const r = chart.timeScale().getVisibleLogicalRange(); if(!r) return;
+  const c=(r.from+r.to)/2, h=(r.to-r.from)/2*f; chart.timeScale().setVisibleLogicalRange({from:c-h, to:c+h});
+}
+$('zout').onclick = ()=>zoom(1.6);
+$('zin').onclick = ()=>zoom(1/1.6);
+
+// ---------- data ----------
+const bucket = (t,cfg)=> cfg.day ? Math.floor(t/86400)*86400 : t;
+function dedupe(arr){
+  const m = new Map(); arr.forEach(p=>m.set(p[0],p[1]));
+  return [...m.entries()].sort((a,b)=>a[0]-b[0]);
+}
+async function fetchBinance(sym, cfg){
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${cfg.b}&limit=${cfg.lim}`);
+  if(!r.ok) throw new Error('binance '+r.status);
+  const j = await r.json();
+  return dedupe(j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), parseFloat(x[4])]));
+}
+async function fetchStocks(){
+  try{
+    const r = await fetch(DATA_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json(); stockData = j.data; stockUpdated = j.updated; return true;
+  }catch(e){ return false; }
+}
+function stockSeries(k, cfg, startT){
+  const pts = stockData && stockData[tf] && stockData[tf][k];
+  if(!pts) return [];
+  return dedupe(pts.map(p=>[bucket(p[0],cfg), p[1]])).filter(p=>p[0]>=startT);
+}
+async function load(){
+  const id = ++loadId, cfg = TF[tf];
+  $('msg').textContent = '불러오는 중…';
+  closeWS();
+  try{
+    const [btc, gold] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg), stockData?null:fetchStocks()]);
+    if(id!==loadId) return;
+    raw.BTC = btc; raw.GOLD = gold;
+    const st = btc.length ? btc[0][0] : 0;
+    ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
+    renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
+    openWS(cfg);
+  }catch(e){
+    $('msg').textContent = '시세를 불러오지 못했습니다. 잠시 후 새로고침해 주세요. ('+e.message+')';
+  }
+}
+function setMsg(){
+  const t = stockUpdated ? new Date((stockUpdated+KST)*1000).toISOString().slice(5,16).replace('T',' ') : null;
+  const miss = ['QQQM','VOO','SCHD'].every(k=>!raw[k]||!raw[k].length);
+  $('msg').textContent = miss ? '주식 데이터 준비 중입니다 (서버 첫 갱신 대기). BTC·GOLD는 실시간입니다.'
+    : `주식 마지막 갱신: ${t} (KST) · BTC·GOLD 실시간 수신 중`;
+}
+setInterval(async ()=>{
+  if(await fetchStocks()){
+    const cfg=TF[tf], st = raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0;
+    ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
+    setMsg();
+  }
+}, 60000);
+
+// ---------- render ----------
+function baseOf(arr){ return mode==='now' ? arr[arr.length-1][1] : arr[0][1]; }
+function renderOne(k){
+  const arr = raw[k];
+  if(!arr || !arr.length){ series[k].setData([]); return; }
+  const b = baseOf(arr);
+  series[k].setData(arr.map(p=>({time:p[0]+KST, value:(p[1]/b-1)*100})));
+}
+function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); }
+
+// ---------- live (Binance websocket) ----------
+let pending = {}, flushT = null;
+function closeWS(){ clearTimeout(wsTimer); if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
+function openWS(cfg){
+  closeWS();
+  const url = `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_${cfg.b}/paxgusdt@kline_${cfg.b}`;
+  const myId = loadId;
+  ws = new WebSocket(url);
+  ws.onmessage = ev=>{
+    const m = JSON.parse(ev.data).data; if(!m||!m.k) return;
+    const k = m.s==='BTCUSDT'?'BTC':'GOLD', arr = raw[k]; if(!arr||!arr.length) return;
+    const t = bucket(Math.floor(m.k.t/1000),cfg), v = parseFloat(m.k.c), last = arr[arr.length-1];
+    if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
+    pending[k]=true;
+    if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; if(!crossOn) setLegend(null); }, 700);
+  };
+  ws.onclose = ()=>{ if(myId===loadId) wsTimer = setTimeout(()=>openWS(cfg), 3000); };
+}
+
+// ---------- legend / tooltip ----------
+function valueAt(arr, t){
+  if(!arr||!arr.length) return null;
+  let lo=0, hi=arr.length-1, ans=-1;
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(arr[mid][0]<=t){ans=mid;lo=mid+1;} else hi=mid-1; }
+  return ans<0 ? null : arr[ans];
+}
+const fmtP = (k,v)=> v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2);
+const fmtPct = p => (p>=0?'+':'')+p.toFixed(2)+'%';
+function rows(t){
+  const cfg = TF[tf];
+  return ASSETS.map(a=>{
+    const arr = raw[a.k]; const pt = t===null ? (arr&&arr.length?arr[arr.length-1]:null) : valueAt(arr,t);
+    if(!pt) return {a, none:true};
+    const b = arr.length ? baseOf(arr) : pt[1];
+    const stale = t!==null && (t-pt[0] > cfg.sec*4);
+    return {a, price:pt[1], pct:(pt[1]/b-1)*100, stale};
+  });
+}
+function setLegend(t){
+  rows(t).forEach(r=>{
+    const c = document.querySelector(`.chip[data-k="${r.a.k}"]`); if(!c) return;
+    const pr=c.querySelector('.pr'), pc=c.querySelector('.pc');
+    if(r.none){ pr.textContent='–'; pc.textContent=''; return; }
+    pr.textContent = fmtP(r.a.k,r.price);
+    pc.textContent = fmtPct(r.pct); pc.className = 'pc '+(r.pct>=0?'up':'dn');
+    c.classList.toggle('stale', !!r.stale);
+  });
+}
+let crossOn = false;
+const tip = $('tip');
+chart.subscribeCrosshairMove(p=>{
+  if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ crossOn=false; tip.style.display='none'; setLegend(null); return; }
+  crossOn = true;
+  const t = p.time - KST, cfg = TF[tf];
+  const d = new Date(p.time*1000).toISOString();
+  const title = cfg.day ? d.slice(0,10) : d.slice(0,10)+' '+d.slice(11,16);
+  const base = mode==='now' ? '오늘 종가 대비' : '구간 시작 대비';
+  tip.innerHTML = `<div class="tt">${title} · ${base}</div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
+    const lab = `<span><i class="dot" style="background:${r.a.color}"></i>${r.a.k}</span>`;
+    if(r.none) return `<div class="r">${lab}<span class="pr">–</span></div>`;
+    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span><span class="pr">${fmtP(r.a.k,r.price)}</span> <b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b></span></div>`;
+  }).join('');
+  tip.style.display='block';
+  const w = tip.offsetWidth, W = $('chart').clientWidth;
+  let x = p.point.x+16; if(x+w > W-6) x = p.point.x-w-16;
+  tip.style.left = Math.max(4,x)+'px'; tip.style.top = '10px';
+  setLegend(t);
+});
+
+buildUI(); bindChips(); fit(); load();
+})();
+</script>
+</body>
+</html>
