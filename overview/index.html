@@ -27,10 +27,12 @@
   .up{color:var(--up)} .dn{color:var(--dn)}
   #chartbox{position:relative}
   #chart{height:calc(100vh - 250px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:190px}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:310px}
   #tip .tt{color:var(--sub);margin-bottom:5px}
-  #tip .r{display:flex;justify-content:space-between;gap:14px;line-height:1.7}
-  #tip .r span:first-child{display:flex;align-items:center;gap:6px}
+  #tip .r{display:grid;grid-template-columns:56px 1fr 88px 70px;gap:8px;white-space:nowrap;align-items:center;line-height:1.7}
+  #tip .r>span:first-child{display:flex;align-items:center;gap:6px}
+  #tip .r>span:not(:first-child){text-align:right}
+  #tip .h{color:var(--sub);font-size:11px;line-height:1.4;margin-bottom:2px}
   #msg{font-size:12px;color:var(--sub);margin-top:8px}
   footer{margin-top:14px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
 </style>
@@ -227,7 +229,8 @@ function rows(t){
     if(!pt) return {a, none:true};
     const b = arr.length ? baseOf(arr) : pt[1];
     const stale = t!==null && (t-pt[0] > cfg.sec*4);
-    return {a, price:pt[1], pct:(pt[1]/b-1)*100, stale};
+    const lastV = arr[arr.length-1][1];
+    return {a, price:pt[1], pct:(pt[1]/b-1)*100, toNow:(lastV/pt[1]-1)*100, stale};
   });
 }
 function setLegend(t){
@@ -249,10 +252,10 @@ chart.subscribeCrosshairMove(p=>{
   const d = new Date(p.time*1000).toISOString();
   const title = cfg.day ? d.slice(0,10) : d.slice(0,10)+' '+d.slice(11,16);
   const base = mode==='now' ? '오늘 종가 대비' : '구간 시작 대비';
-  tip.innerHTML = `<div class="tt">${title} · ${base}</div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
+  tip.innerHTML = `<div class="tt">${title}</div><div class="r h"><span></span><span>가격</span><span>${base}</span><span>이날→오늘</span></div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
     const lab = `<span><i class="dot" style="background:${r.a.color}"></i>${r.a.k}</span>`;
-    if(r.none) return `<div class="r">${lab}<span class="pr">–</span></div>`;
-    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span><span class="pr">${fmtP(r.a.k,r.price)}</span> <b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b></span></div>`;
+    if(r.none) return `<div class="r">${lab}<span class="pr">–</span><span></span><span></span></div>`;
+    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span class="pr">${fmtP(r.a.k,r.price)}</span><b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b><b class="${r.toNow>=0?'up':'dn'}">${fmtPct(r.toNow)}</b></div>`;
   }).join('');
   tip.style.display='block';
   const w = tip.offsetWidth, W = $('chart').clientWidth;
