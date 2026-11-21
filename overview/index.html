@@ -26,7 +26,7 @@
   .pr{color:var(--sub)}
   .up{color:var(--up)} .dn{color:var(--dn)}
   #chartbox{position:relative}
-  #chart{height:calc(100vh - 250px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #chart{height:calc(100vh - 290px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
   #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:400px}
   #tip .tt{color:var(--sub);margin-bottom:5px}
   #tip .r{display:grid;grid-template-columns:56px 1fr 66px 92px 70px;gap:8px;white-space:nowrap;align-items:center;line-height:1.7}
@@ -35,6 +35,14 @@
   #tip .h{color:var(--sub);font-size:11px;line-height:1.4;margin-bottom:2px}
   #msg{font-size:12px;color:var(--sub);margin-top:8px}
   footer{margin-top:14px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
+  .tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+  .tools .lbl{color:var(--sub);font-size:12px;margin-left:8px}
+  select{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
+  #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
+  #draw.act{pointer-events:auto;cursor:crosshair}
+  #rsibox{display:none;margin-top:6px}
+  #rsi{height:130px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  body.rsi #chart{height:calc(100vh - 430px);min-height:260px}
 </style>
 </head>
 <body>
@@ -52,7 +60,17 @@
     </div>
   </div>
   <div class="legend" id="legend"></div>
-  <div id="chartbox"><div id="chart"></div><div id="tip"></div></div>
+  <div class="tools">
+    <div class="grp" id="ctype"><button data-c="line" class="on">선</button><button data-c="candle">캔들</button></div>
+    <span class="lbl">대상</span><select id="tgt"></select>
+    <span class="lbl">지표</span>
+    <div class="grp" id="inds"><button data-i="ma20">MA20</button><button data-i="ma60">MA60</button><button data-i="ema20">EMA20</button><button data-i="bb">볼린저</button><button data-i="rsi">RSI</button></div>
+    <span class="lbl">그리기</span>
+    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
+    <span class="lbl" id="cnote"></span>
+  </div>
+  <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
+  <div id="rsibox"><div id="rsi"></div></div>
   <div id="msg"></div>
   <footer>
     BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
@@ -83,14 +101,14 @@ const TF = {
   '20Y': {b:'1w',  lim:1000, sec:604800, span:40*365*86400,   key:'20Y', day:true},
 };
 let tf = '1D', curCfg = null, ymode = 'pct';
-const raw = {}, series = {}, hidden = {};
+const raw = {}, series = {}, hidden = {}, ohlc = {};
 let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0;
 
 const $ = id => document.getElementById(id);
 const chart = LightweightCharts.createChart($('chart'), {
   layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
   grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
-  rightPriceScale:{borderColor:'#2a2f3a'},
+  rightPriceScale:{borderColor:'#2a2f3a', minimumWidth:70},
   timeScale:{borderColor:'#2a2f3a', timeVisible:true, secondsVisible:false, rightOffset:4},
   crosshair:{mode:0},
   localization:{priceFormatter:v=>ymode==='pct'?v.toFixed(1)+'%':(v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):v.toFixed(2))},
@@ -104,8 +122,183 @@ ASSETS.forEach(a=>{
 });
 let zeroLine = series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
 
-function fit(){ chart.resize($('chart').clientWidth, $('chart').clientHeight); }
+function fit(){
+  chart.resize($('chart').clientWidth, $('chart').clientHeight);
+  if(inds.rsi) rsiChart.resize($('rsi').clientWidth, $('rsi').clientHeight);
+  sizeCv();
+}
 window.addEventListener('resize', fit);
+
+// ---------- 분석 도구: 캔들 · 지표 · 그리기 ----------
+const ts = chart.timeScale();
+let ctype='line', target='BTC', tool=null, pend=null, hover=null, hitD=null, drawings=[], rdT=null;
+const inds = {ma20:false, ma60:false, ema20:false, bb:false, rsi:false};
+const fmtAxis = v=> ymode==='pct' ? v.toFixed(2)+'%' : (v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2));
+const cand = chart.addCandlestickSeries({upColor:'#34d399', downColor:'#ff6b6b', borderVisible:false, wickUpColor:'#34d399', wickDownColor:'#ff6b6b', priceLineVisible:false, lastValueVisible:true, visible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}});
+function mkLine(color,w,style){ return chart.addLineSeries({color, lineWidth:w, lineStyle:style||0, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}}); }
+const S = {ma20:mkLine('#fbbf24',1), ma60:mkLine('#f472b6',1), ema20:mkLine('#22d3ee',1), bbU:mkLine('#94a3b8',1), bbM:mkLine('#94a3b8',1,2), bbL:mkLine('#94a3b8',1)};
+const rsiChart = LightweightCharts.createChart($('rsi'), {
+  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
+  grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
+  rightPriceScale:{borderColor:'#2a2f3a', minimumWidth:70, scaleMargins:{top:.08, bottom:.08}},
+  timeScale:{visible:false, rightOffset:4},
+  handleScroll:false, handleScale:false, crosshair:{mode:0},
+  localization:{priceFormatter:v=>v.toFixed(0)},
+});
+const rsiCarrier = rsiChart.addLineSeries({visible:false, priceLineVisible:false, lastValueVisible:false});
+const rsiSer = rsiChart.addLineSeries({color:'#c084fc', lineWidth:2, priceLineVisible:false, lastValueVisible:true, priceFormat:{type:'custom', formatter:v=>v.toFixed(1), minMove:0.1}, autoscaleInfoProvider:()=>({priceRange:{minValue:0, maxValue:100}})});
+[70,30].forEach(v=>rsiSer.createPriceLine({price:v, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:''}));
+ts.subscribeVisibleLogicalRangeChange(lr=>{ if(lr && inds.rsi){ try{ rsiChart.timeScale().setVisibleLogicalRange(lr); }catch(e){} } redrawSoon(); });
+ts.subscribeVisibleTimeRangeChange(()=>redrawSoon());
+
+const conv = (p,b)=> ymode==='pct' ? (p/b-1)*100 : p;
+const unconv = (v,b)=> ymode==='pct' ? b*(1+v/100) : v;
+function calcSMA(a,n){ const o=[]; let s=0; for(let i=0;i<a.length;i++){ s+=a[i][1]; if(i>=n) s-=a[i-n][1]; if(i>=n-1) o.push([a[i][0], s/n]); } return o; }
+function calcEMA(a,n){ const o=[], k=2/(n+1); if(a.length<n) return o; let e=0; for(let i=0;i<n;i++) e+=a[i][1]; e/=n; o.push([a[n-1][0], e]); for(let i=n;i<a.length;i++){ e=a[i][1]*k+e*(1-k); o.push([a[i][0], e]); } return o; }
+function calcBB(a,n,m){ const o=[]; for(let i=n-1;i<a.length;i++){ let s=0; for(let j=i-n+1;j<=i;j++) s+=a[j][1]; const mu=s/n; let v=0; for(let j=i-n+1;j<=i;j++) v+=(a[j][1]-mu)**2; const sd=Math.sqrt(v/n); o.push([a[i][0], mu, mu+m*sd, mu-m*sd]); } return o; }
+function calcRSI(a,n){ const o=[]; if(a.length<=n) return o; let g=0, l=0; for(let i=1;i<=n;i++){ const d=a[i][1]-a[i-1][1]; if(d>=0) g+=d; else l-=d; } g/=n; l/=n; o.push([a[n][0], l===0?100:100-100/(1+g/l)]); for(let i=n+1;i<a.length;i++){ const d=a[i][1]-a[i-1][1]; g=(g*(n-1)+(d>0?d:0))/n; l=(l*(n-1)+(d<0?-d:0))/n; o.push([a[i][0], l===0?100:100-100/(1+g/l)]); } return o; }
+
+function applyVis(){
+  const o = ohlc[target], useC = ctype==='candle' && o && o.length;
+  ASSETS.forEach(a=>series[a.k].applyOptions({visible: !hidden[a.k] && !(useC && a.k===target)}));
+  cand.applyOptions({visible: !!useC && !hidden[target]});
+}
+function renderRSI(){
+  const arr = raw[target];
+  if(inds.rsi){
+    const set = new Set(); ASSETS.forEach(a=>(raw[a.k]||[]).forEach(p=>set.add(p[0])));
+    rsiCarrier.setData([...set].sort((a,b)=>a-b).map(t=>({time:t+KST})));
+    rsiSer.setData(arr&&arr.length ? calcRSI(arr,14).map(p=>({time:p[0]+KST, value:p[1]})) : []);
+    const lr = ts.getVisibleLogicalRange(); if(lr){ try{ rsiChart.timeScale().setVisibleLogicalRange(lr); }catch(e){} }
+  } else { rsiSer.setData([]); rsiCarrier.setData([]); }
+}
+function renderExtras(){
+  const arr = raw[target], has = !!(arr&&arr.length), b = has ? baseOf(arr) : 1;
+  const mk = a=>a.map(p=>({time:p[0]+KST, value:conv(p[1],b)}));
+  S.ma20.setData(has&&inds.ma20 ? mk(calcSMA(arr,20)) : []);
+  S.ma60.setData(has&&inds.ma60 ? mk(calcSMA(arr,60)) : []);
+  S.ema20.setData(has&&inds.ema20 ? mk(calcEMA(arr,20)) : []);
+  if(has&&inds.bb){
+    const r = calcBB(arr,20,2);
+    S.bbM.setData(r.map(p=>({time:p[0]+KST, value:conv(p[1],b)})));
+    S.bbU.setData(r.map(p=>({time:p[0]+KST, value:conv(p[2],b)})));
+    S.bbL.setData(r.map(p=>({time:p[0]+KST, value:conv(p[3],b)})));
+  } else { S.bbM.setData([]); S.bbU.setData([]); S.bbL.setData([]); }
+  const o = ohlc[target], useC = ctype==='candle' && o && o.length;
+  cand.setData(useC ? o.map(r=>({time:r[0]+KST, open:conv(r[1],b), high:conv(r[2],b), low:conv(r[3],b), close:conv(r[4],b)})) : []);
+  applyVis();
+  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD만 가능 (주식은 종가만 있어 선으로 표시)' : '';
+  renderRSI(); redrawSoon();
+}
+
+// 그리기 캔버스
+const cv = $('draw'), cx = cv.getContext('2d');
+function sizeCv(){ const w=$('chart').clientWidth, h=$('chart').clientHeight, d=window.devicePixelRatio||1; cv.width=w*d; cv.height=h*d; cv.style.width=w+'px'; cv.style.height=h+'px'; cx.setTransform(d,0,0,d,0,0); redraw(); }
+function plotSize(){ const W=$('chart').clientWidth, H=$('chart').clientHeight; let pw=70, th=28; try{ pw=chart.priceScale('right').width(); }catch(e){} try{ th=ts.height(); }catch(e){} return {W, H, pl:W-pw, pb:H-th}; }
+function bpx(){ const lr=ts.getVisibleLogicalRange(); if(!lr) return null; return plotSize().pl/(lr.to-lr.from); }
+function t2x(t){
+  const a=raw[target]; if(!a||!a.length||!curCfg) return null;
+  const n=a.length, xf=i=>ts.timeToCoordinate(a[i][0]+KST);
+  if(t<=a[0][0]){ const x0=xf(0), bs=bpx(); return (x0===null||bs===null) ? null : x0-(a[0][0]-t)/curCfg.sec*bs; }
+  if(t>=a[n-1][0]){ const x1=xf(n-1), bs=bpx(); return (x1===null||bs===null) ? null : x1+(t-a[n-1][0])/curCfg.sec*bs; }
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(a[m][0]<=t) lo=m; else hi=m; }
+  const xa=xf(lo), xb=xf(hi); if(xa===null||xb===null) return null;
+  return xa+(xb-xa)*(t-a[lo][0])/(a[hi][0]-a[lo][0]);
+}
+function x2t(x){
+  const a=raw[target]; if(!a||!a.length||!curCfg) return null;
+  const n=a.length, xf=i=>ts.timeToCoordinate(a[i][0]+KST);
+  const x0=xf(0), x1=xf(n-1), bs=bpx(); if(x0===null||x1===null||bs===null) return null;
+  if(x<=x0) return a[0][0]-(x0-x)/bs*curCfg.sec;
+  if(x>=x1) return a[n-1][0]+(x-x1)/bs*curCfg.sec;
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1, xm=xf(m); if(xm!==null && xm<=x) lo=m; else hi=m; }
+  const xa=xf(lo), xb=xf(hi); if(xa===null||xb===null||xb===xa) return a[lo][0];
+  return a[lo][0]+(a[hi][0]-a[lo][0])*(x-xa)/(xb-xa);
+}
+const refList = ()=>[cand, series[target], ...ASSETS.map(a=>series[a.k])];
+function p2y(v){ for(const s of refList()){ const y=s.priceToCoordinate(v); if(y!==null) return y; } return null; }
+function y2p(y){ for(const s of refList()){ const v=s.coordinateToPrice(y); if(v!==null) return v; } return null; }
+function xy(o,b){ const x=t2x(o.t), y=p2y(conv(o.p,b)); return (x===null||y===null) ? null : {x,y}; }
+const FIB = [0,0.236,0.382,0.5,0.618,0.786,1];
+function drawOne(d,b,L,prev,hl){
+  const A=xy(d.a,b); if(!A) return;
+  cx.lineWidth = hl?2.5:1.5; cx.strokeStyle = hl?'#ff6b6b':'#4aa3ff'; cx.setLineDash(prev?[5,4]:[]); cx.font='11px sans-serif'; cx.fillStyle='#4aa3ff';
+  if(d.type==='hline'){ cx.beginPath(); cx.moveTo(0,A.y); cx.lineTo(L.pl,A.y); cx.stroke(); cx.fillText(fmtP(null,d.a.p), 6, A.y-4); cx.setLineDash([]); return; }
+  if(d.type==='vline'){ cx.beginPath(); cx.moveTo(A.x,0); cx.lineTo(A.x,L.pb); cx.stroke(); cx.setLineDash([]); return; }
+  const B = d.b ? xy(d.b,b) : null; if(!B){ cx.setLineDash([]); return; }
+  if(d.type==='trend'){ cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); [A,B].forEach(q=>{ cx.beginPath(); cx.arc(q.x,q.y,3,0,6.3); cx.fill(); }); }
+  else if(d.type==='rect'){ cx.fillStyle='rgba(74,163,255,.12)'; cx.fillRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); cx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); }
+  else if(d.type==='fib'){
+    const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x);
+    FIB.forEach((lv,i)=>{
+      const pr = d.b.p + (d.a.p-d.b.p)*lv, y = p2y(conv(pr,b)); if(y===null) return;
+      cx.globalAlpha = (lv===0||lv===1)?1:.75; cx.beginPath(); cx.moveTo(x1,y); cx.lineTo(x2,y); cx.stroke(); cx.globalAlpha=1;
+      cx.fillText((lv*100).toFixed(1)+'%  '+fmtP(null,pr), x1+4, y-3);
+    });
+    cx.setLineDash([3,4]); cx.globalAlpha=.5; cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); cx.globalAlpha=1;
+  }
+  cx.setLineDash([]);
+}
+function redrawSoon(){ if(rdT) return; rdT=requestAnimationFrame(()=>{ rdT=null; redraw(); }); }
+function redraw(){
+  const L=plotSize(); cx.clearRect(0,0,L.W,L.H);
+  const a=raw[target]; if(!a||!a.length) return; const b=baseOf(a);
+  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
+  drawings.forEach(d=>{ if(d.k===target) drawOne(d,b,L,false,d===hitD); });
+  if(pend&&hover) drawOne({type:pend.type, a:pend.a, b:hover}, b, L, true, false);
+  cx.restore();
+}
+function saveDraw(){ try{ localStorage.setItem('ov_draw', JSON.stringify(drawings)); }catch(e){} }
+try{ const j=JSON.parse(localStorage.getItem('ov_draw')||'[]'); if(Array.isArray(j)) drawings=j; }catch(e){}
+function evPos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function mkPt(pos){
+  const a=raw[target]; if(!a||!a.length) return null;
+  const L=plotSize(); if(pos.x>L.pl||pos.y>L.pb) return null;
+  const t=x2t(pos.x), v=y2p(pos.y); if(t===null||v===null) return null;
+  return {t, p:unconv(v,baseOf(a))};
+}
+function segDist(p,a,b){ const dx=b.x-a.x, dy=b.y-a.y, l=dx*dx+dy*dy; let t=l?((p.x-a.x)*dx+(p.y-a.y)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy)); }
+function hitTest(pos){
+  const a=raw[target]; if(!a||!a.length) return null; const b=baseOf(a); let best=null, bd=10;
+  drawings.forEach(d=>{
+    if(d.k!==target) return; const A=xy(d.a,b), B=d.b?xy(d.b,b):null; if(!A) return; let dist=1e9;
+    if(d.type==='hline') dist=Math.abs(pos.y-A.y);
+    else if(d.type==='vline') dist=Math.abs(pos.x-A.x);
+    else if(B && d.type==='trend') dist=segDist(pos,A,B);
+    else if(B){ const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x), y1=Math.min(A.y,B.y), y2=Math.max(A.y,B.y); if(pos.x>=x1-8&&pos.x<=x2+8&&pos.y>=y1-8&&pos.y<=y2+8) dist=0; }
+    if(dist<bd){ bd=dist; best=d; }
+  });
+  return best;
+}
+function syncBtns(){
+  document.querySelectorAll('#ctype button').forEach(b=>b.classList.toggle('on', b.dataset.c===ctype));
+  document.querySelectorAll('#inds button').forEach(b=>b.classList.toggle('on', !!inds[b.dataset.i]));
+  document.querySelectorAll('#dtools button[data-d]').forEach(b=>b.classList.toggle('on', b.dataset.d===tool));
+  cv.classList.toggle('act', !!tool);
+}
+function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncBtns(); redraw(); }
+cv.addEventListener('mousemove', e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); redrawSoon(); });
+cv.addEventListener('mouseleave', ()=>{ hover=null; hitD=null; redrawSoon(); });
+cv.addEventListener('click', e=>{
+  const pos=evPos(e);
+  if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
+  const pt=mkPt(pos); if(!pt||!tool) return;
+  if(tool==='hline'||tool==='vline'){ drawings.push({k:target, type:tool, a:pt}); finish(); return; }
+  if(!pend){ pend={type:tool, a:pt}; hover=pt; redraw(); return; }
+  drawings.push({k:target, type:pend.type, a:pend.a, b:pt}); finish();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && (tool||pend)){ tool=null; pend=null; hover=null; syncBtns(); redraw(); } });
+$('tgt').innerHTML = ASSETS.map(a=>`<option value="${a.k}">${a.k}</option>`).join('');
+$('tgt').onchange = e=>{ target=e.target.value; pend=null; hover=null; renderExtras(); };
+$('ctype').addEventListener('click', e=>{ const c=e.target.dataset.c; if(!c) return; ctype=c; syncBtns(); renderExtras(); });
+$('inds').addEventListener('click', e=>{
+  const i=e.target.dataset.i; if(!i) return; inds[i]=!inds[i]; syncBtns();
+  if(i==='rsi'){ document.body.classList.toggle('rsi',inds.rsi); $('rsibox').style.display=inds.rsi?'block':'none'; fit(); }
+  renderExtras();
+});
+$('dtools').addEventListener('click', e=>{ const d=e.target.dataset.d; if(!d) return; tool = tool===d ? null : d; pend=null; hover=null; hitD=null; syncBtns(); redraw(); });
+$('undo').onclick = ()=>{ for(let i=drawings.length-1;i>=0;i--){ if(drawings[i].k===target){ drawings.splice(i,1); break; } } saveDraw(); redraw(); };
+$('clr').onclick = ()=>{ drawings=drawings.filter(d=>d.k!==target); saveDraw(); redraw(); };
 
 // ---------- UI ----------
 function buildUI(){
@@ -117,7 +310,7 @@ $('tfs').addEventListener('click', e=>{ const k=e.target.dataset.tf; if(k&&k!==t
 function bindChips(){
   document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
     const k=c.dataset.k; if(k==='BTC') return;
-    hidden[k]=!hidden[k]; c.classList.toggle('off',hidden[k]); series[k].applyOptions({visible:!hidden[k]});
+    hidden[k]=!hidden[k]; c.classList.toggle('off',hidden[k]); applyVis(); redrawSoon();
   });
 }
 $('ymode').addEventListener('click', e=>{
@@ -147,7 +340,9 @@ async function fetchBinance(sym, cfg){
   const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${cfg.b}&limit=${cfg.lim}`);
   if(!r.ok) throw new Error('binance '+r.status);
   const j = await r.json();
-  return dedupe(j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), parseFloat(x[4])]));
+  const rows = j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), +x[1], +x[2], +x[3], +x[4]]);
+  const om = new Map(); rows.forEach(r=>om.set(r[0],r));
+  return {c: dedupe(rows.map(r=>[r[0],r[4]])), o: [...om.values()].sort((a,b)=>a[0]-b[0])};
 }
 async function fetchStocks(){
   try{
@@ -176,9 +371,10 @@ async function load(){
       cfg = Object.assign({}, cfg, {lim: Math.min(1000, Math.max(60, Math.ceil((now-startT)/300)+3))});
     }
     curCfg = cfg;
-    const [btc, gold] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
+    const [bt, gd] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
     if(id!==loadId) return;
-    raw.BTC = btc; raw.GOLD = gold;
+    const btc = bt.c;
+    raw.BTC = btc; raw.GOLD = gd.c; ohlc.BTC = bt.o; ohlc.GOLD = gd.o;
     const st = cfg.dyn ? (btc.length ? btc[0][0] : 0) : Date.now()/1000 - cfg.span;
     ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
     renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
@@ -197,7 +393,7 @@ setInterval(async ()=>{
   if(await fetchStocks()){
     const cfg=curCfg, st = cfg.dyn ? (raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0) : Date.now()/1000 - cfg.span;
     ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
-    setMsg();
+    renderExtras(); setMsg();
   }
 }, 60000);
 
@@ -209,7 +405,7 @@ function renderOne(k){
   const b = baseOf(arr);
   series[k].setData(arr.map(p=>({time:p[0]+KST, value: ymode==='pct' ? (p[1]/b-1)*100 : p[1]})));
 }
-function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); }
+function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); renderExtras(); }
 
 // ---------- live (Binance websocket) ----------
 let pending = {}, flushT = null;
@@ -224,8 +420,10 @@ function openWS(cfg){
     const k = m.s==='BTCUSDT'?'BTC':'GOLD', arr = raw[k]; if(!arr||!arr.length) return;
     const t = bucket(Math.floor(m.k.t/1000),cfg), v = parseFloat(m.k.c), last = arr[arr.length-1];
     if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
+    const oa = ohlc[k];
+    if(oa&&oa.length){ const lo=oa[oa.length-1], h=parseFloat(m.k.h), l=parseFloat(m.k.l); if(t===lo[0]){ lo[2]=h; lo[3]=l; lo[4]=v; } else if(t>lo[0]) oa.push([t,parseFloat(m.k.o),h,l,v]); }
     pending[k]=true;
-    if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; if(!crossOn) setLegend(null); }, 700);
+    if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
   };
   ws.onclose = ()=>{ if(myId===loadId) wsTimer = setTimeout(()=>openWS(cfg), 3000); };
 }
@@ -262,7 +460,7 @@ function setLegend(t){
 }
 let crossOn = false;
 const tip = $('tip');
-chart.subscribeCrosshairMove(p=>{
+chart.subscribeCrosshairMove(p=>{ redrawSoon();
   if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ crossOn=false; tip.style.display='none'; setLegend(null); return; }
   crossOn = true;
   const t = p.time - KST, cfg = curCfg;
