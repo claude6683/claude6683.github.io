@@ -303,8 +303,9 @@ function redraw(){
     // 돌파 화살표: 상승 ▲(선 아래→위), 하락 ▼ / CHoCH는 흰 테두리로 강조
     { const sz=s.internal?6:9, d=s.bull?1:-1, ay=y+(s.bull?sz*2.2:-sz*2.2);
       cx.beginPath(); cx.moveTo(x2,ay-d*sz*1.6); cx.lineTo(x2-sz,ay+d*sz*0.6); cx.lineTo(x2+sz,ay+d*sz*0.6); cx.closePath();
-      cx.fillStyle=col; cx.fill();
-      if(s.tag==='CHoCH'){ cx.strokeStyle='#fff'; cx.lineWidth=1.5; cx.stroke(); } }
+      cx.save(); cx.globalAlpha=.22; cx.fillStyle=col; cx.fill();   // 워터마크처럼 흐리게
+      if(s.tag==='CHoCH'){ cx.globalAlpha=.35; cx.strokeStyle='#fff'; cx.lineWidth=1; cx.stroke(); }
+      cx.restore(); }
   });
   // equal highs/lows
   if(on.eq) view.eqs.forEach(e=>{
