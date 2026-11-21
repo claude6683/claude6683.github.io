@@ -1,0 +1,34 @@
+name: dash-data
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # 30분마다
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dash-data
+  cancel-in-progress: true
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install yfinance pandas
+      - run: python scripts/dash_data.py
+      - name: publish dash branch
+        run: |
+          mkdir out && mv dash.json out/
+          cd out
+          git init -q -b dash
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add dash.json
+          git commit -qm "dash"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" dash

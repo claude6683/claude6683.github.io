@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>overview · #6683</title>
+<style>
+  :root{--bg:#0f1115;--card:#181b22;--line:#2a2f3a;--tx:#e8eaf0;--sub:#8b93a7;--ac:#4aa3ff;--up:#34d399;--dn:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Malgun Gothic",sans-serif}
+  .wrap{max-width:1200px;margin:0 auto;padding:14px 14px 28px}
+  .top{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:10px}
+  .top a{color:var(--sub);text-decoration:none;font-size:14px}
+  h1{font-size:20px;margin:0 8px 0 0}
+  .grp{display:flex;gap:4px;flex-wrap:wrap}
+  button{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 11px;font-size:13px;cursor:pointer}
+  button.on{border-color:var(--ac);color:var(--ac)}
+  .sp{flex:1}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+  .chip{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:13px;cursor:pointer;user-select:none}
+  .chip.off{opacity:.35}
+  .chip.stale .pc{opacity:.5}
+  .dot{width:10px;height:10px;border-radius:50%}
+  .chip b{font-weight:600}
+  .chip .base{font-size:10px;color:var(--sub);border:1px solid var(--line);border-radius:6px;padding:0 5px}
+  .pr{color:var(--sub)}
+  .up{color:var(--up)} .dn{color:var(--dn)}
+  #chartbox{position:relative}
+  #chart{height:calc(100vh - 290px);min-height:360px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;min-width:400px}
+  #tip .tt{color:var(--sub);margin-bottom:5px}
+  #tip .r{display:grid;grid-template-columns:56px 1fr 66px 92px 70px;gap:8px;white-space:nowrap;align-items:center;line-height:1.7}
+  #tip .r>span:first-child{display:flex;align-items:center;gap:6px}
+  #tip .r>span:not(:first-child){text-align:right}
+  #tip .h{color:var(--sub);font-size:11px;line-height:1.4;margin-bottom:2px}
+  #msg{font-size:12px;color:var(--sub);margin-top:8px}
+  footer{margin-top:14px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
+  .tools{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;align-items:center;margin-bottom:10px}
+  .tools .grp{flex-wrap:nowrap;gap:3px}
+  .tools button,.tools select{font-size:10.4px;padding:4px 7px;white-space:nowrap;border-radius:7px}
+  .tools .lbl{color:var(--sub);font-size:10px;margin-left:6px;white-space:nowrap}
+  select{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
+  #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
+  #draw.act{pointer-events:auto;cursor:crosshair}
+  #rsibox{display:none;margin-top:6px}
+  #rsi{height:130px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  body.rsi #chart{height:calc(100vh - 430px);min-height:260px}
+  /* Dashboard 안에 넣는 차트: 머리글·꼬리말 제거, 칸 높이에 맞춤 */
+  .wrap{max-width:none;padding:6px 8px 4px}
+  .top a,.top span,.top h1{display:none}
+  #chart{height:calc(100vh - 190px)!important;min-height:120px}
+  body.rsi #chart{height:calc(100vh - 330px)!important}
+  footer{display:none}
+  .tools,.legend{margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <a href="../">#6683</a><span style="color:var(--sub)">/</span>
+    <h1>overview</h1>
+    <div class="grp" id="tfs"></div>
+    <div class="grp" id="ymode"><button data-m="price">가격</button><button data-m="pct" class="on">%</button></div>
+    <div class="sp"></div>
+    <div class="grp">
+      <button id="zout" title="줌아웃">−</button>
+      <button id="zin" title="줌인">+</button>
+      <button id="fit" title="전체 보기">전체</button>
+    </div>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="tools">
+    <div class="grp" id="ctype"><button data-c="line" class="on">선</button><button data-c="candle">캔들</button></div>
+    <span class="lbl">대상</span><select id="tgt"></select>
+    <span class="lbl">지표</span>
+    <div class="grp" id="inds"><button data-i="vw100">VWMA100</button><button data-i="vw200">VWMA200</button><button data-i="vw300">VWMA300</button><button data-i="bb">볼린저</button><button data-i="rsi">RSI</button></div>
+    <span class="lbl">그리기</span>
+    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
+    <span class="lbl" id="cnote"></span>
+  </div>
+  <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
+  <div id="rsibox"><div id="rsi"></div></div>
+  <div id="msg"></div>
+  <footer>
+    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · XYZ100: Hyperliquid(XYZ100USDC.P) 실시간, 주말에도 나스닥 확인용 · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
+    차트는 구간 시작을 0%로 맞춰 누가 더 오르고 내렸는지 비교합니다 (1D = 최근 주식 거래일 시작부터 · 상장이 늦은 종목은 상장일부터 표시 · 장이 닫힌 시간엔 주식 선이 멈춤). 마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
+    본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+  </footer>
+</div>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+(function(){
+const KST = 32400;
+const DATA_URL = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/data/data.json';
+const ASSETS = [
+  {k:'BTC',  color:'#f7931a', w:3,   src:'bn', sym:'BTCUSDT', base:true},
+  {k:'QQQM', color:'#4aa3ff', w:1.5, src:'yf'},
+  {k:'VOO',  color:'#a78bfa', w:1.5, src:'yf'},
+  {k:'GOLD', color:'#facc15', w:1.5, src:'bn', sym:'PAXGUSDT'},
+  {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
+  {k:'XYZ100', color:'#f472b6', w:1.5, src:'hl', sym:'xyz:XYZ100'},
+];
+const TF = {
+  '1H':  {b:'1m',  lim:60,   sec:60,     span:3600,           key:'1H'},
+  '1D':  {b:'5m',  lim:288,  sec:300,    dyn:true,            key:'2D'},
+  '7D':  {b:'30m', lim:336,  sec:1800,   span:7*86400,        key:'7D'},
+  '1M':  {b:'1h',  lim:720,  sec:3600,   span:30*86400,       key:'1M'},
+  '1Y':  {b:'1d',  lim:365,  sec:86400,  span:365*86400,      key:'1Y',  day:true},
+  '5Y':  {b:'1w',  lim:260,  sec:604800, span:5*365*86400,    key:'5Y',  day:true},
+  '10Y': {b:'1w',  lim:522,  sec:604800, span:10*365*86400,   key:'10Y', day:true},
+  '20Y': {b:'1w',  lim:1000, sec:604800, span:40*365*86400,   key:'20Y', day:true},
+};
+let tf = '1D', curCfg = null, ymode = 'pct';
+const raw = {}, series = {}, hidden = {}, ohlc = {};
+let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0, ws2 = null, wsTimer2 = null;
+
+const $ = id => document.getElementById(id);
+const chart = LightweightCharts.createChart($('chart'), {
+  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
+  grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
+  rightPriceScale:{borderColor:'#2a2f3a', minimumWidth:70},
+  timeScale:{borderColor:'#2a2f3a', timeVisible:true, secondsVisible:false, rightOffset:4},
+  crosshair:{mode:0},
+  localization:{priceFormatter:v=>ymode==='pct'?v.toFixed(1)+'%':(v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):v.toFixed(2))},
+});
+ASSETS.forEach(a=>{
+  series[a.k] = chart.addLineSeries({
+    color:a.color, lineWidth:a.w, priceLineVisible:false, lastValueVisible:true,
+    crosshairMarkerVisible:true, priceFormat:{type:'custom', formatter:v=>ymode==='pct'?v.toFixed(2)+'%':(v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):v.toFixed(2)), minMove:0.01},
+  });
+  hidden[a.k] = false;
+});
+let zeroLine = series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
+
+function fit(){
+  chart.resize($('chart').clientWidth, $('chart').clientHeight);
+  if(inds.rsi) rsiChart.resize($('rsi').clientWidth, $('rsi').clientHeight);
+  sizeCv();
+}
+window.addEventListener('resize', fit);
+
+// ---------- 분석 도구: 캔들 · 지표 · 그리기 ----------
+const ts = chart.timeScale();
+let ctype='line', target='BTC', tool=null, pend=null, hover=null, hitD=null, drawings=[], rdT=null;
+const inds = {vw100:false, vw200:false, vw300:false, bb:false, rsi:false};
+const fmtAxis = v=> ymode==='pct' ? v.toFixed(2)+'%' : (v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2));
+const cand = chart.addCandlestickSeries({upColor:'#34d399', downColor:'#ff6b6b', borderVisible:false, wickUpColor:'#34d399', wickDownColor:'#ff6b6b', priceLineVisible:false, lastValueVisible:true, visible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}});
+function mkLine(color,w,style){ return chart.addLineSeries({color, lineWidth:w, lineStyle:style||0, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}}); }
+const S = {vw100:mkLine('#fbbf24',1.5), vw200:mkLine('#f472b6',1.5), vw300:mkLine('#22d3ee',1.5), bbU:mkLine('#94a3b8',1), bbM:mkLine('#94a3b8',1,2), bbL:mkLine('#94a3b8',1)};
+const rsiChart = LightweightCharts.createChart($('rsi'), {
+  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
+  grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
+  rightPriceScale:{borderColor:'#2a2f3a', minimumWidth:70, scaleMargins:{top:.08, bottom:.08}},
+  timeScale:{visible:false, rightOffset:4},
+  handleScroll:false, handleScale:false, crosshair:{mode:0},
+  localization:{priceFormatter:v=>v.toFixed(0)},
+});
+const rsiCarrier = rsiChart.addLineSeries({visible:false, priceLineVisible:false, lastValueVisible:false});
+const rsiSer = rsiChart.addLineSeries({color:'#c084fc', lineWidth:2, priceLineVisible:false, lastValueVisible:true, priceFormat:{type:'custom', formatter:v=>v.toFixed(1), minMove:0.1}, autoscaleInfoProvider:()=>({priceRange:{minValue:0, maxValue:100}})});
+[70,30].forEach(v=>rsiSer.createPriceLine({price:v, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:''}));
+ts.subscribeVisibleLogicalRangeChange(lr=>{ if(lr && inds.rsi){ try{ rsiChart.timeScale().setVisibleLogicalRange(lr); }catch(e){} } redrawSoon(); });
+ts.subscribeVisibleTimeRangeChange(()=>redrawSoon());
+
+const conv = (p,b)=> ymode==='pct' ? (p/b-1)*100 : p;
+const unconv = (v,b)=> ymode==='pct' ? b*(1+v/100) : v;
+function calcVWMA(o,n){ const r=[]; let sv=0, sp=0; for(let i=0;i<o.length;i++){ const v=o[i][5]||0, c=o[i][4]; sv+=v; sp+=c*v; if(i>=n){ const w=o[i-n][5]||0; sv-=w; sp-=o[i-n][4]*w; } if(i>=n-1 && sv>0) r.push([o[i][0], sp/sv]); } return r; }
+function calcSMA(a,n){ const o=[]; let s=0; for(let i=0;i<a.length;i++){ s+=a[i][1]; if(i>=n) s-=a[i-n][1]; if(i>=n-1) o.push([a[i][0], s/n]); } return o; }
+function calcEMA(a,n){ const o=[], k=2/(n+1); if(a.length<n) return o; let e=0; for(let i=0;i<n;i++) e+=a[i][1]; e/=n; o.push([a[n-1][0], e]); for(let i=n;i<a.length;i++){ e=a[i][1]*k+e*(1-k); o.push([a[i][0], e]); } return o; }
+function calcBB(a,n,m){ const o=[]; for(let i=n-1;i<a.length;i++){ let s=0; for(let j=i-n+1;j<=i;j++) s+=a[j][1]; const mu=s/n; let v=0; for(let j=i-n+1;j<=i;j++) v+=(a[j][1]-mu)**2; const sd=Math.sqrt(v/n); o.push([a[i][0], mu, mu+m*sd, mu-m*sd]); } return o; }
+function calcRSI(a,n){ const o=[]; if(a.length<=n) return o; let g=0, l=0; for(let i=1;i<=n;i++){ const d=a[i][1]-a[i-1][1]; if(d>=0) g+=d; else l-=d; } g/=n; l/=n; o.push([a[n][0], l===0?100:100-100/(1+g/l)]); for(let i=n+1;i<a.length;i++){ const d=a[i][1]-a[i-1][1]; g=(g*(n-1)+(d>0?d:0))/n; l=(l*(n-1)+(d<0?-d:0))/n; o.push([a[i][0], l===0?100:100-100/(1+g/l)]); } return o; }
+
+function applyVis(){
+  const o = ohlc[target], useC = ctype==='candle' && o && o.length;
+  ASSETS.forEach(a=>series[a.k].applyOptions({visible: !hidden[a.k] && !(useC && a.k===target)}));
+  cand.applyOptions({visible: !!useC && !hidden[target]});
+}
+function renderRSI(){
+  const arr = raw[target];
+  if(inds.rsi){
+    const set = new Set(); ASSETS.forEach(a=>(raw[a.k]||[]).forEach(p=>set.add(p[0])));
+    rsiCarrier.setData([...set].sort((a,b)=>a-b).map(t=>({time:t+KST})));
+    rsiSer.setData(arr&&arr.length ? calcRSI(arr,14).map(p=>({time:p[0]+KST, value:p[1]})) : []);
+    const lr = ts.getVisibleLogicalRange(); if(lr){ try{ rsiChart.timeScale().setVisibleLogicalRange(lr); }catch(e){} }
+  } else { rsiSer.setData([]); rsiCarrier.setData([]); }
+}
+function renderExtras(){
+  const arr = raw[target], has = !!(arr&&arr.length), b = has ? baseOf(arr) : 1;
+  const mk = a=>a.map(p=>({time:p[0]+KST, value:conv(p[1],b)}));
+  const ov = ohlc[target];
+  [[100,'vw100'],[200,'vw200'],[300,'vw300']].forEach(([n,k])=>S[k].setData(has&&inds[k]&&ov&&ov.length ? mk(calcVWMA(ov,n)) : []));
+  if(has&&inds.bb){
+    const r = calcBB(arr,20,2);
+    S.bbM.setData(r.map(p=>({time:p[0]+KST, value:conv(p[1],b)})));
+    S.bbU.setData(r.map(p=>({time:p[0]+KST, value:conv(p[2],b)})));
+    S.bbL.setData(r.map(p=>({time:p[0]+KST, value:conv(p[3],b)})));
+  } else { S.bbM.setData([]); S.bbU.setData([]); S.bbL.setData([]); }
+  const o = ohlc[target], useC = ctype==='candle' && o && o.length;
+  cand.setData(useC ? o.map(r=>({time:r[0]+KST, open:conv(r[1],b), high:conv(r[2],b), low:conv(r[3],b), close:conv(r[4],b)})) : []);
+  applyVis();
+  const vwOn = inds.vw100||inds.vw200||inds.vw300;
+  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD·XYZ100만 가능 (주식은 종가만 있어 선으로 표시)' : ((vwOn && !(ov&&ov.length)) ? 'VWMA는 거래량이 있는 BTC·GOLD·XYZ100만 가능' : '');
+  renderRSI(); redrawSoon();
+}
+
+// 그리기 캔버스
+const cv = $('draw'), cx = cv.getContext('2d');
+function sizeCv(){ const w=$('chart').clientWidth, h=$('chart').clientHeight, d=window.devicePixelRatio||1; cv.width=w*d; cv.height=h*d; cv.style.width=w+'px'; cv.style.height=h+'px'; cx.setTransform(d,0,0,d,0,0); redraw(); }
+function plotSize(){ const W=$('chart').clientWidth, H=$('chart').clientHeight; let pw=70, th=28; try{ pw=chart.priceScale('right').width(); }catch(e){} try{ th=ts.height(); }catch(e){} return {W, H, pl:W-pw, pb:H-th}; }
+function bpx(){ const lr=ts.getVisibleLogicalRange(); if(!lr) return null; return plotSize().pl/(lr.to-lr.from); }
+function t2x(t){
+  const a=raw[target]; if(!a||!a.length||!curCfg) return null;
+  const n=a.length, xf=i=>ts.timeToCoordinate(a[i][0]+KST);
+  if(t<=a[0][0]){ const x0=xf(0), bs=bpx(); return (x0===null||bs===null) ? null : x0-(a[0][0]-t)/curCfg.sec*bs; }
+  if(t>=a[n-1][0]){ const x1=xf(n-1), bs=bpx(); return (x1===null||bs===null) ? null : x1+(t-a[n-1][0])/curCfg.sec*bs; }
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(a[m][0]<=t) lo=m; else hi=m; }
+  const xa=xf(lo), xb=xf(hi); if(xa===null||xb===null) return null;
+  return xa+(xb-xa)*(t-a[lo][0])/(a[hi][0]-a[lo][0]);
+}
+function x2t(x){
+  const a=raw[target]; if(!a||!a.length||!curCfg) return null;
+  const n=a.length, xf=i=>ts.timeToCoordinate(a[i][0]+KST);
+  const x0=xf(0), x1=xf(n-1), bs=bpx(); if(x0===null||x1===null||bs===null) return null;
+  if(x<=x0) return a[0][0]-(x0-x)/bs*curCfg.sec;
+  if(x>=x1) return a[n-1][0]+(x-x1)/bs*curCfg.sec;
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1, xm=xf(m); if(xm!==null && xm<=x) lo=m; else hi=m; }
+  const xa=xf(lo), xb=xf(hi); if(xa===null||xb===null||xb===xa) return a[lo][0];
+  return a[lo][0]+(a[hi][0]-a[lo][0])*(x-xa)/(xb-xa);
+}
+const refList = ()=>[cand, series[target], ...ASSETS.map(a=>series[a.k])];
+function p2y(v){ for(const s of refList()){ const y=s.priceToCoordinate(v); if(y!==null) return y; } return null; }
+function y2p(y){ for(const s of refList()){ const v=s.coordinateToPrice(y); if(v!==null) return v; } return null; }
+function xy(o,b){ const x=t2x(o.t), y=p2y(conv(o.p,b)); return (x===null||y===null) ? null : {x,y}; }
+const FIB = [0,0.236,0.382,0.5,0.618,0.786,1];
+function drawOne(d,b,L,prev,hl){
+  const A=xy(d.a,b); if(!A) return;
+  cx.lineWidth = hl?2.5:1.5; cx.strokeStyle = hl?'#ff6b6b':'#4aa3ff'; cx.setLineDash(prev?[5,4]:[]); cx.font='11px sans-serif'; cx.fillStyle='#4aa3ff';
+  if(d.type==='hline'){ cx.beginPath(); cx.moveTo(0,A.y); cx.lineTo(L.pl,A.y); cx.stroke(); cx.fillText(fmtP(null,d.a.p), 6, A.y-4); cx.setLineDash([]); return; }
+  if(d.type==='vline'){ cx.beginPath(); cx.moveTo(A.x,0); cx.lineTo(A.x,L.pb); cx.stroke(); cx.setLineDash([]); return; }
+  const B = d.b ? xy(d.b,b) : null; if(!B){ cx.setLineDash([]); return; }
+  if(d.type==='trend'){ cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); [A,B].forEach(q=>{ cx.beginPath(); cx.arc(q.x,q.y,3,0,6.3); cx.fill(); }); }
+  else if(d.type==='rect'){ cx.fillStyle='rgba(74,163,255,.12)'; cx.fillRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); cx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); }
+  else if(d.type==='fib'){
+    const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x);
+    FIB.forEach((lv,i)=>{
+      const pr = d.b.p + (d.a.p-d.b.p)*lv, y = p2y(conv(pr,b)); if(y===null) return;
+      cx.globalAlpha = (lv===0||lv===1)?1:.75; cx.beginPath(); cx.moveTo(x1,y); cx.lineTo(x2,y); cx.stroke(); cx.globalAlpha=1;
+      cx.fillText((lv*100).toFixed(1)+'%  '+fmtP(null,pr), x1+4, y-3);
+    });
+    cx.setLineDash([3,4]); cx.globalAlpha=.5; cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); cx.globalAlpha=1;
+  }
+  cx.setLineDash([]);
+}
+function redrawSoon(){ if(rdT) return; rdT=requestAnimationFrame(()=>{ rdT=null; redraw(); }); }
+function redraw(){
+  const L=plotSize(); cx.clearRect(0,0,L.W,L.H);
+  const a=raw[target]; if(!a||!a.length) return; const b=baseOf(a);
+  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
+  drawings.forEach(d=>{ if(d.k===target) drawOne(d,b,L,false,d===hitD); });
+  if(pend&&hover) drawOne({type:pend.type, a:pend.a, b:hover}, b, L, true, false);
+  cx.restore();
+}
+function saveDraw(){ try{ localStorage.setItem('ov_draw', JSON.stringify(drawings)); }catch(e){} }
+try{ const j=JSON.parse(localStorage.getItem('ov_draw')||'[]'); if(Array.isArray(j)) drawings=j; }catch(e){}
+function evPos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function mkPt(pos){
+  const a=raw[target]; if(!a||!a.length) return null;
+  const L=plotSize(); if(pos.x>L.pl||pos.y>L.pb) return null;
+  const t=x2t(pos.x), v=y2p(pos.y); if(t===null||v===null) return null;
+  return {t, p:unconv(v,baseOf(a))};
+}
+function segDist(p,a,b){ const dx=b.x-a.x, dy=b.y-a.y, l=dx*dx+dy*dy; let t=l?((p.x-a.x)*dx+(p.y-a.y)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(p.x-(a.x+t*dx), p.y-(a.y+t*dy)); }
+function hitTest(pos){
+  const a=raw[target]; if(!a||!a.length) return null; const b=baseOf(a); let best=null, bd=10;
+  drawings.forEach(d=>{
+    if(d.k!==target) return; const A=xy(d.a,b), B=d.b?xy(d.b,b):null; if(!A) return; let dist=1e9;
+    if(d.type==='hline') dist=Math.abs(pos.y-A.y);
+    else if(d.type==='vline') dist=Math.abs(pos.x-A.x);
+    else if(B && d.type==='trend') dist=segDist(pos,A,B);
+    else if(B){ const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x), y1=Math.min(A.y,B.y), y2=Math.max(A.y,B.y); if(pos.x>=x1-8&&pos.x<=x2+8&&pos.y>=y1-8&&pos.y<=y2+8) dist=0; }
+    if(dist<bd){ bd=dist; best=d; }
+  });
+  return best;
+}
+function syncBtns(){
+  document.querySelectorAll('#ctype button').forEach(b=>b.classList.toggle('on', b.dataset.c===ctype));
+  document.querySelectorAll('#inds button').forEach(b=>b.classList.toggle('on', !!inds[b.dataset.i]));
+  document.querySelectorAll('#dtools button[data-d]').forEach(b=>b.classList.toggle('on', b.dataset.d===tool));
+  cv.classList.toggle('act', !!tool);
+}
+function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncBtns(); redraw(); }
+cv.addEventListener('mousemove', e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); redrawSoon(); });
+cv.addEventListener('mouseleave', ()=>{ hover=null; hitD=null; redrawSoon(); });
+cv.addEventListener('click', e=>{
+  const pos=evPos(e);
+  if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
+  const pt=mkPt(pos); if(!pt||!tool) return;
+  if(tool==='hline'||tool==='vline'){ drawings.push({k:target, type:tool, a:pt}); finish(); return; }
+  if(!pend){ pend={type:tool, a:pt}; hover=pt; redraw(); return; }
+  drawings.push({k:target, type:pend.type, a:pend.a, b:pt}); finish();
+});
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && (tool||pend)){ tool=null; pend=null; hover=null; syncBtns(); redraw(); } });
+$('tgt').innerHTML = ASSETS.map(a=>`<option value="${a.k}">${a.k}</option>`).join('');
+$('tgt').onchange = e=>{ target=e.target.value; pend=null; hover=null; renderExtras(); };
+$('ctype').addEventListener('click', e=>{ const c=e.target.dataset.c; if(!c) return; ctype=c; syncBtns(); renderExtras(); });
+$('inds').addEventListener('click', e=>{
+  const i=e.target.dataset.i; if(!i) return; inds[i]=!inds[i]; syncBtns();
+  if(i==='rsi'){ document.body.classList.toggle('rsi',inds.rsi); $('rsibox').style.display=inds.rsi?'block':'none'; fit(); }
+  renderExtras();
+});
+$('dtools').addEventListener('click', e=>{ const d=e.target.dataset.d; if(!d) return; tool = tool===d ? null : d; pend=null; hover=null; hitD=null; syncBtns(); redraw(); });
+$('undo').onclick = ()=>{ for(let i=drawings.length-1;i>=0;i--){ if(drawings[i].k===target){ drawings.splice(i,1); break; } } saveDraw(); redraw(); };
+$('clr').onclick = ()=>{ drawings=drawings.filter(d=>d.k!==target); saveDraw(); redraw(); };
+
+// ---------- UI ----------
+function buildUI(){
+  $('tfs').innerHTML = Object.keys(TF).map(k=>`<button data-tf="${k}" class="${k===tf?'on':''}">${k}</button>`).join('');
+  $('legend').innerHTML = ASSETS.map(a=>
+    `<div class="chip" data-k="${a.k}"><span class="dot" style="background:${a.color}"></span><b>${a.k}</b>${a.base?'<span class="base">기준</span>':''}<span class="pr"></span><span class="pc"></span></div>`).join('');
+}
+$('tfs').addEventListener('click', e=>{ const k=e.target.dataset.tf; if(k&&k!==tf){tf=k; buildUI(); bindChips(); load();} });
+function bindChips(){
+  document.querySelectorAll('.chip').forEach(c=>c.onclick=()=>{
+    const k=c.dataset.k; if(k==='BTC') return;
+    hidden[k]=!hidden[k]; c.classList.toggle('off',hidden[k]); applyVis(); redrawSoon();
+  });
+}
+$('ymode').addEventListener('click', e=>{
+  const m = e.target.dataset.m; if(!m || m===ymode) return;
+  ymode = m;
+  document.querySelectorAll('#ymode button').forEach(b=>b.classList.toggle('on', b.dataset.m===m));
+  if(zeroLine){ series.BTC.removePriceLine(zeroLine); zeroLine=null; }
+  if(m==='pct') zeroLine = series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
+  chart.applyOptions({rightPriceScale:{mode: m==='price'?1:0}});
+  renderAll(); chart.timeScale().fitContent();
+});
+$('fit').onclick = ()=>chart.timeScale().fitContent();
+function zoom(f){
+  const r = chart.timeScale().getVisibleLogicalRange(); if(!r) return;
+  const c=(r.from+r.to)/2, h=(r.to-r.from)/2*f; chart.timeScale().setVisibleLogicalRange({from:c-h, to:c+h});
+}
+$('zout').onclick = ()=>zoom(1.6);
+$('zin').onclick = ()=>zoom(1/1.6);
+
+// ---------- data ----------
+const bucket = (t,cfg)=> cfg.day ? Math.floor(t/86400)*86400 : t;
+function dedupe(arr){
+  const m = new Map(); arr.forEach(p=>m.set(p[0],p[1]));
+  return [...m.entries()].sort((a,b)=>a[0]-b[0]);
+}
+async function fetchBinance(sym, cfg){
+  const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${cfg.b}&limit=${cfg.lim}`);
+  if(!r.ok) throw new Error('binance '+r.status);
+  const j = await r.json();
+  const rows = j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), +x[1], +x[2], +x[3], +x[4], +x[5]]);
+  const om = new Map(); rows.forEach(r=>om.set(r[0],r));
+  return {c: dedupe(rows.map(r=>[r[0],r[4]])), o: [...om.values()].sort((a,b)=>a[0]-b[0])};
+}
+const HL_IV = {'1m':'1m','5m':'5m','30m':'30m','1h':'1h','1d':'1d','1w':'1w'};
+async function fetchHL(sym, cfg){
+  const now = Date.now(), start = now - (cfg.lim+2)*cfg.sec*1000;
+  const r = await fetch('https://api.hyperliquid.xyz/info', {method:'POST', headers:{'content-type':'application/json'},
+    body: JSON.stringify({type:'candleSnapshot', req:{coin:sym, interval:HL_IV[cfg.b], startTime:start, endTime:now}})});
+  if(!r.ok) throw new Error('hl '+r.status);
+  const j = await r.json();
+  const om = new Map(); j.forEach(x=>{ const t=bucket(Math.floor(x.t/1000),cfg); om.set(t,[t,+x.o,+x.h,+x.l,+x.c,+x.v]); });
+  const o = [...om.values()].sort((a,b)=>a[0]-b[0]);
+  return {c: o.map(r=>[r[0],r[4]]), o};
+}
+async function fetchStocks(){
+  try{
+    const r = await fetch(DATA_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
+    if(!r.ok) throw new Error(r.status);
+    const j = await r.json(); stockData = j.data; stockUpdated = j.updated; return true;
+  }catch(e){ return false; }
+}
+function stockSeries(k, cfg, startT){
+  const pts = stockData && stockData[cfg.key] && stockData[cfg.key][k];
+  if(!pts) return [];
+  return dedupe(pts.map(p=>[bucket(p[0],cfg), p[1]])).filter(p=>p[0]>=startT);
+}
+async function load(){
+  const id = ++loadId; let cfg = TF[tf];
+  $('msg').textContent = '불러오는 중…';
+  closeWS();
+  try{
+    if(!stockData) await fetchStocks();
+    if(cfg.dyn){
+      // 1D: 가장 최근 주식 거래일 시작부터 지금까지 (주말엔 금요일 장 ~ 현재)
+      const now = Date.now()/1000;
+      let lastT = 0;
+      ['QQQM','VOO','SCHD'].forEach(k=>{ const a = stockData&&stockData['2D']&&stockData['2D'][k]; if(a&&a.length) lastT=Math.max(lastT,a[a.length-1][0]); });
+      const startT = (lastT && now-lastT < 5*86400) ? lastT-20*3600 : now-86400;
+      cfg = Object.assign({}, cfg, {lim: Math.min(1000, Math.max(60, Math.ceil((now-startT)/300)+3))});
+    }
+    curCfg = cfg;
+    const [bt, gd] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
+    if(id!==loadId) return;
+    const btc = bt.c;
+    raw.BTC = btc; raw.GOLD = gd.c; ohlc.BTC = bt.o; ohlc.GOLD = gd.o;
+    try{ const xz = await fetchHL('xyz:XYZ100',cfg); if(id!==loadId) return; raw.XYZ100 = xz.c; ohlc.XYZ100 = xz.o; }catch(e){ raw.XYZ100 = []; ohlc.XYZ100 = []; }
+    const st = cfg.dyn ? (btc.length ? btc[0][0] : 0) : Date.now()/1000 - cfg.span;
+    ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
+    renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
+    openWS(cfg);
+  }catch(e){
+    $('msg').textContent = '시세를 불러오지 못했습니다. 잠시 후 새로고침해 주세요. ('+e.message+')';
+  }
+}
+function setMsg(){
+  const t = stockUpdated ? new Date((stockUpdated+KST)*1000).toISOString().slice(5,16).replace('T',' ') : null;
+  const miss = ['QQQM','VOO','SCHD'].every(k=>!raw[k]||!raw[k].length);
+  $('msg').textContent = miss ? '주식 데이터 준비 중입니다 (서버 첫 갱신 대기). BTC·GOLD는 실시간입니다.'
+    : `주식 마지막 갱신: ${t} (KST) · BTC·GOLD 실시간 수신 중`;
+}
+setInterval(async ()=>{
+  if(await fetchStocks()){
+    const cfg=curCfg, st = cfg.dyn ? (raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0) : Date.now()/1000 - cfg.span;
+    ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
+    renderExtras(); setMsg();
+  }
+}, 60000);
+
+// ---------- render ----------
+function baseOf(arr){ return arr[0][1]; }  // 차트 기준: 구간 시작 = 0%
+function renderOne(k){
+  const arr = raw[k];
+  if(!arr || !arr.length){ series[k].setData([]); return; }
+  const b = baseOf(arr);
+  series[k].setData(arr.map(p=>({time:p[0]+KST, value: ymode==='pct' ? (p[1]/b-1)*100 : p[1]})));
+}
+function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); renderExtras(); }
+
+// ---------- live (Binance websocket) ----------
+let pending = {}, flushT = null;
+function closeWS(){ clearTimeout(wsTimer); clearTimeout(wsTimer2); if(ws2){ ws2.onclose=null; try{ws2.close();}catch(e){} ws2=null; } if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
+function openWS(cfg){
+  closeWS();
+  const url = `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_${cfg.b}/paxgusdt@kline_${cfg.b}`;
+  const myId = loadId;
+  ws = new WebSocket(url);
+  ws.onmessage = ev=>{
+    const m = JSON.parse(ev.data).data; if(!m||!m.k) return;
+    const k = m.s==='BTCUSDT'?'BTC':'GOLD', arr = raw[k]; if(!arr||!arr.length) return;
+    const t = bucket(Math.floor(m.k.t/1000),cfg), v = parseFloat(m.k.c), last = arr[arr.length-1];
+    if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
+    const oa = ohlc[k];
+    if(oa&&oa.length){ const lo=oa[oa.length-1], h=parseFloat(m.k.h), l=parseFloat(m.k.l); if(t===lo[0]){ lo[2]=h; lo[3]=l; lo[4]=v; lo[5]=parseFloat(m.k.v); } else if(t>lo[0]) oa.push([t,parseFloat(m.k.o),h,l,v,parseFloat(m.k.v)]); }
+    pending[k]=true;
+    if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
+  };
+  ws.onclose = ()=>{ if(myId===loadId) wsTimer = setTimeout(()=>openWS(cfg), 3000); };
+  // XYZ100 (Hyperliquid) 실시간
+  try{
+    ws2 = new WebSocket('wss://api.hyperliquid.xyz/ws');
+    ws2.onopen = ()=>{ ws2.send(JSON.stringify({method:'subscribe', subscription:{type:'candle', coin:'xyz:XYZ100', interval:HL_IV[cfg.b]}})); };
+    ws2.onmessage = ev=>{
+      let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      if(m.channel!=='candle'||!m.data) return;
+      const c=m.data, arr=raw.XYZ100; if(!arr||!arr.length) return;
+      const t=bucket(Math.floor(c.t/1000),cfg), v=+c.c, last=arr[arr.length-1];
+      if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
+      const oa=ohlc.XYZ100;
+      if(oa&&oa.length){ const lo=oa[oa.length-1]; if(t===lo[0]){ lo[2]=+c.h; lo[3]=+c.l; lo[4]=v; lo[5]=+c.v; } else if(t>lo[0]) oa.push([t,+c.o,+c.h,+c.l,v,+c.v]); }
+      pending.XYZ100=true;
+      if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
+    };
+    ws2.onclose = ()=>{ if(myId===loadId) wsTimer2 = setTimeout(()=>openWS(cfg), 3000); };
+  }catch(e){}
+}
+
+// ---------- legend / tooltip ----------
+function valueAt(arr, t){
+  if(!arr||!arr.length) return null;
+  let lo=0, hi=arr.length-1, ans=-1;
+  while(lo<=hi){ const mid=(lo+hi)>>1; if(arr[mid][0]<=t){ans=mid;lo=mid+1;} else hi=mid-1; }
+  return ans<0 ? null : arr[ans];
+}
+const fmtP = (k,v)=> v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2);
+const fmtPct = p => (p>=0?'+':'')+p.toFixed(2)+'%';
+function rows(t){
+  const cfg = curCfg;
+  return ASSETS.map(a=>{
+    const arr = raw[a.k]; const pt = t===null ? (arr&&arr.length?arr[arr.length-1]:null) : valueAt(arr,t);
+    if(!pt) return {a, none:true};
+    const b = arr.length ? baseOf(arr) : pt[1];
+    const stale = t!==null && (t-pt[0] > Math.max(cfg.sec*4,1200));
+    const lastV = arr[arr.length-1][1];
+    return {a, price:pt[1], pct:(pt[1]/b-1)*100, vsNow:(pt[1]/lastV-1)*100, toNow:(lastV/pt[1]-1)*100, stale};
+  });
+}
+function setLegend(t){
+  rows(t).forEach(r=>{
+    const c = document.querySelector(`.chip[data-k="${r.a.k}"]`); if(!c) return;
+    const pr=c.querySelector('.pr'), pc=c.querySelector('.pc');
+    if(r.none){ pr.textContent='–'; pc.textContent=''; return; }
+    pr.textContent = fmtP(r.a.k,r.price);
+    pc.textContent = fmtPct(r.pct); pc.className = 'pc '+(r.pct>=0?'up':'dn');
+    c.classList.toggle('stale', !!r.stale);
+  });
+}
+let crossOn = false;
+const tip = $('tip');
+chart.subscribeCrosshairMove(p=>{ redrawSoon();
+  if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ crossOn=false; tip.style.display='none'; setLegend(null); return; }
+  crossOn = true;
+  const t = p.time - KST, cfg = curCfg;
+  const d = new Date(p.time*1000).toISOString();
+  const title = cfg.day ? d.slice(0,10) : d.slice(0,10)+' '+d.slice(11,16);
+  tip.innerHTML = `<div class="tt">${title}</div><div class="r h"><span></span><span>가격</span><span>시작 대비</span><span>오늘 종가 대비</span><span>이날→오늘</span></div>` + rows(t).filter(r=>!hidden[r.a.k]).map(r=>{
+    const lab = `<span><i class="dot" style="background:${r.a.color}"></i>${r.a.k}</span>`;
+    if(r.none) return `<div class="r">${lab}<span class="pr">–</span><span></span><span></span><span></span></div>`;
+    return `<div class="r" style="${r.stale?'opacity:.55':''}">${lab}<span class="pr">${fmtP(r.a.k,r.price)}</span><b class="${r.pct>=0?'up':'dn'}">${fmtPct(r.pct)}</b><b class="${r.vsNow>=0?'up':'dn'}">${fmtPct(r.vsNow)}</b><b class="${r.toNow>=0?'up':'dn'}">${fmtPct(r.toNow)}</b></div>`;
+  }).join('');
+  tip.style.display='block';
+  const w = tip.offsetWidth, W = $('chart').clientWidth;
+  let x = p.point.x+16; if(x+w > W-6) x = p.point.x-w-16;
+  tip.style.left = Math.max(4,x)+'px'; tip.style.top = '10px';
+  setLegend(t);
+});
+
+buildUI(); bindChips(); fit(); load();
+})();
+</script>
+</body>
+</html>
