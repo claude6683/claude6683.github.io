@@ -43,6 +43,7 @@
     <a href="../">#6683</a><span style="color:var(--sub)">/</span>
     <h1>overview</h1>
     <div class="grp" id="tfs"></div>
+    <div class="grp" id="ymode"><button data-m="price">가격</button><button data-m="pct" class="on">%</button></div>
     <div class="sp"></div>
     <div class="grp">
       <button id="zout" title="줌아웃">−</button>
@@ -81,7 +82,7 @@ const TF = {
   '10Y': {b:'1w',  lim:522,  sec:604800, span:10*365*86400,   key:'10Y', day:true},
   '20Y': {b:'1w',  lim:1000, sec:604800, span:40*365*86400,   key:'20Y', day:true},
 };
-let tf = '1D', curCfg = null;
+let tf = '1D', curCfg = null, ymode = 'pct';
 const raw = {}, series = {}, hidden = {};
 let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0;
 
@@ -92,16 +93,16 @@ const chart = LightweightCharts.createChart($('chart'), {
   rightPriceScale:{borderColor:'#2a2f3a'},
   timeScale:{borderColor:'#2a2f3a', timeVisible:true, secondsVisible:false, rightOffset:4},
   crosshair:{mode:0},
-  localization:{priceFormatter:v=>v.toFixed(1)+'%'},
+  localization:{priceFormatter:v=>ymode==='pct'?v.toFixed(1)+'%':(v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):v.toFixed(2))},
 });
 ASSETS.forEach(a=>{
   series[a.k] = chart.addLineSeries({
     color:a.color, lineWidth:a.w, priceLineVisible:false, lastValueVisible:true,
-    crosshairMarkerVisible:true, priceFormat:{type:'custom', formatter:v=>v.toFixed(2)+'%', minMove:0.01},
+    crosshairMarkerVisible:true, priceFormat:{type:'custom', formatter:v=>ymode==='pct'?v.toFixed(2)+'%':(v>=1000?v.toLocaleString('en-US',{maximumFractionDigits:0}):v.toFixed(2)), minMove:0.01},
   });
   hidden[a.k] = false;
 });
-series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
+let zeroLine = series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
 
 function fit(){ chart.resize($('chart').clientWidth, $('chart').clientHeight); }
 window.addEventListener('resize', fit);
@@ -119,6 +120,15 @@ function bindChips(){
     hidden[k]=!hidden[k]; c.classList.toggle('off',hidden[k]); series[k].applyOptions({visible:!hidden[k]});
   });
 }
+$('ymode').addEventListener('click', e=>{
+  const m = e.target.dataset.m; if(!m || m===ymode) return;
+  ymode = m;
+  document.querySelectorAll('#ymode button').forEach(b=>b.classList.toggle('on', b.dataset.m===m));
+  if(zeroLine){ series.BTC.removePriceLine(zeroLine); zeroLine=null; }
+  if(m==='pct') zeroLine = series.BTC.createPriceLine({price:0, color:'#555b6b', lineWidth:1, lineStyle:2, axisLabelVisible:false});
+  chart.applyOptions({rightPriceScale:{mode: m==='price'?1:0}});
+  renderAll(); chart.timeScale().fitContent();
+});
 $('fit').onclick = ()=>chart.timeScale().fitContent();
 function zoom(f){
   const r = chart.timeScale().getVisibleLogicalRange(); if(!r) return;
@@ -197,7 +207,7 @@ function renderOne(k){
   const arr = raw[k];
   if(!arr || !arr.length){ series[k].setData([]); return; }
   const b = baseOf(arr);
-  series[k].setData(arr.map(p=>({time:p[0]+KST, value:(p[1]/b-1)*100})));
+  series[k].setData(arr.map(p=>({time:p[0]+KST, value: ymode==='pct' ? (p[1]/b-1)*100 : p[1]})));
 }
 function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); }
 
