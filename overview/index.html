@@ -35,8 +35,10 @@
   #tip .h{color:var(--sub);font-size:11px;line-height:1.4;margin-bottom:2px}
   #msg{font-size:12px;color:var(--sub);margin-top:8px}
   footer{margin-top:14px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:12px}
-  .tools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
-  .tools .lbl{color:var(--sub);font-size:12px;margin-left:8px}
+  .tools{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;align-items:center;margin-bottom:10px}
+  .tools .grp{flex-wrap:nowrap;gap:3px}
+  .tools button,.tools select{font-size:10.4px;padding:4px 7px;white-space:nowrap;border-radius:7px}
+  .tools .lbl{color:var(--sub);font-size:10px;margin-left:6px;white-space:nowrap}
   select{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
   #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
   #draw.act{pointer-events:auto;cursor:crosshair}
@@ -64,7 +66,7 @@
     <div class="grp" id="ctype"><button data-c="line" class="on">선</button><button data-c="candle">캔들</button></div>
     <span class="lbl">대상</span><select id="tgt"></select>
     <span class="lbl">지표</span>
-    <div class="grp" id="inds"><button data-i="ma20">MA20</button><button data-i="ma60">MA60</button><button data-i="ema20">EMA20</button><button data-i="bb">볼린저</button><button data-i="rsi">RSI</button></div>
+    <div class="grp" id="inds"><button data-i="vw100">VWMA100</button><button data-i="vw200">VWMA200</button><button data-i="vw300">VWMA300</button><button data-i="bb">볼린저</button><button data-i="rsi">RSI</button></div>
     <span class="lbl">그리기</span>
     <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
     <span class="lbl" id="cnote"></span>
@@ -132,11 +134,11 @@ window.addEventListener('resize', fit);
 // ---------- 분석 도구: 캔들 · 지표 · 그리기 ----------
 const ts = chart.timeScale();
 let ctype='line', target='BTC', tool=null, pend=null, hover=null, hitD=null, drawings=[], rdT=null;
-const inds = {ma20:false, ma60:false, ema20:false, bb:false, rsi:false};
+const inds = {vw100:false, vw200:false, vw300:false, bb:false, rsi:false};
 const fmtAxis = v=> ymode==='pct' ? v.toFixed(2)+'%' : (v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v.toFixed(2));
 const cand = chart.addCandlestickSeries({upColor:'#34d399', downColor:'#ff6b6b', borderVisible:false, wickUpColor:'#34d399', wickDownColor:'#ff6b6b', priceLineVisible:false, lastValueVisible:true, visible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}});
 function mkLine(color,w,style){ return chart.addLineSeries({color, lineWidth:w, lineStyle:style||0, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false, priceFormat:{type:'custom', formatter:fmtAxis, minMove:0.01}}); }
-const S = {ma20:mkLine('#fbbf24',1), ma60:mkLine('#f472b6',1), ema20:mkLine('#22d3ee',1), bbU:mkLine('#94a3b8',1), bbM:mkLine('#94a3b8',1,2), bbL:mkLine('#94a3b8',1)};
+const S = {vw100:mkLine('#fbbf24',1.5), vw200:mkLine('#f472b6',1.5), vw300:mkLine('#22d3ee',1.5), bbU:mkLine('#94a3b8',1), bbM:mkLine('#94a3b8',1,2), bbL:mkLine('#94a3b8',1)};
 const rsiChart = LightweightCharts.createChart($('rsi'), {
   layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
   grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
@@ -153,6 +155,7 @@ ts.subscribeVisibleTimeRangeChange(()=>redrawSoon());
 
 const conv = (p,b)=> ymode==='pct' ? (p/b-1)*100 : p;
 const unconv = (v,b)=> ymode==='pct' ? b*(1+v/100) : v;
+function calcVWMA(o,n){ const r=[]; let sv=0, sp=0; for(let i=0;i<o.length;i++){ const v=o[i][5]||0, c=o[i][4]; sv+=v; sp+=c*v; if(i>=n){ const w=o[i-n][5]||0; sv-=w; sp-=o[i-n][4]*w; } if(i>=n-1 && sv>0) r.push([o[i][0], sp/sv]); } return r; }
 function calcSMA(a,n){ const o=[]; let s=0; for(let i=0;i<a.length;i++){ s+=a[i][1]; if(i>=n) s-=a[i-n][1]; if(i>=n-1) o.push([a[i][0], s/n]); } return o; }
 function calcEMA(a,n){ const o=[], k=2/(n+1); if(a.length<n) return o; let e=0; for(let i=0;i<n;i++) e+=a[i][1]; e/=n; o.push([a[n-1][0], e]); for(let i=n;i<a.length;i++){ e=a[i][1]*k+e*(1-k); o.push([a[i][0], e]); } return o; }
 function calcBB(a,n,m){ const o=[]; for(let i=n-1;i<a.length;i++){ let s=0; for(let j=i-n+1;j<=i;j++) s+=a[j][1]; const mu=s/n; let v=0; for(let j=i-n+1;j<=i;j++) v+=(a[j][1]-mu)**2; const sd=Math.sqrt(v/n); o.push([a[i][0], mu, mu+m*sd, mu-m*sd]); } return o; }
@@ -175,9 +178,8 @@ function renderRSI(){
 function renderExtras(){
   const arr = raw[target], has = !!(arr&&arr.length), b = has ? baseOf(arr) : 1;
   const mk = a=>a.map(p=>({time:p[0]+KST, value:conv(p[1],b)}));
-  S.ma20.setData(has&&inds.ma20 ? mk(calcSMA(arr,20)) : []);
-  S.ma60.setData(has&&inds.ma60 ? mk(calcSMA(arr,60)) : []);
-  S.ema20.setData(has&&inds.ema20 ? mk(calcEMA(arr,20)) : []);
+  const ov = ohlc[target];
+  [[100,'vw100'],[200,'vw200'],[300,'vw300']].forEach(([n,k])=>S[k].setData(has&&inds[k]&&ov&&ov.length ? mk(calcVWMA(ov,n)) : []));
   if(has&&inds.bb){
     const r = calcBB(arr,20,2);
     S.bbM.setData(r.map(p=>({time:p[0]+KST, value:conv(p[1],b)})));
@@ -187,7 +189,8 @@ function renderExtras(){
   const o = ohlc[target], useC = ctype==='candle' && o && o.length;
   cand.setData(useC ? o.map(r=>({time:r[0]+KST, open:conv(r[1],b), high:conv(r[2],b), low:conv(r[3],b), close:conv(r[4],b)})) : []);
   applyVis();
-  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD만 가능 (주식은 종가만 있어 선으로 표시)' : '';
+  const vwOn = inds.vw100||inds.vw200||inds.vw300;
+  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD만 가능 (주식은 종가만 있어 선으로 표시)' : ((vwOn && !(ov&&ov.length)) ? 'VWMA는 거래량이 있는 BTC·GOLD만 가능' : '');
   renderRSI(); redrawSoon();
 }
 
@@ -340,7 +343,7 @@ async function fetchBinance(sym, cfg){
   const r = await fetch(`https://api.binance.com/api/v3/klines?symbol=${sym}&interval=${cfg.b}&limit=${cfg.lim}`);
   if(!r.ok) throw new Error('binance '+r.status);
   const j = await r.json();
-  const rows = j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), +x[1], +x[2], +x[3], +x[4]]);
+  const rows = j.map(x=>[bucket(Math.floor(x[0]/1000),cfg), +x[1], +x[2], +x[3], +x[4], +x[5]]);
   const om = new Map(); rows.forEach(r=>om.set(r[0],r));
   return {c: dedupe(rows.map(r=>[r[0],r[4]])), o: [...om.values()].sort((a,b)=>a[0]-b[0])};
 }
@@ -421,7 +424,7 @@ function openWS(cfg){
     const t = bucket(Math.floor(m.k.t/1000),cfg), v = parseFloat(m.k.c), last = arr[arr.length-1];
     if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
     const oa = ohlc[k];
-    if(oa&&oa.length){ const lo=oa[oa.length-1], h=parseFloat(m.k.h), l=parseFloat(m.k.l); if(t===lo[0]){ lo[2]=h; lo[3]=l; lo[4]=v; } else if(t>lo[0]) oa.push([t,parseFloat(m.k.o),h,l,v]); }
+    if(oa&&oa.length){ const lo=oa[oa.length-1], h=parseFloat(m.k.h), l=parseFloat(m.k.l); if(t===lo[0]){ lo[2]=h; lo[3]=l; lo[4]=v; lo[5]=parseFloat(m.k.v); } else if(t>lo[0]) oa.push([t,parseFloat(m.k.o),h,l,v,parseFloat(m.k.v)]); }
     pending[k]=true;
     if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
   };
