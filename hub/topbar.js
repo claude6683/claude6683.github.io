@@ -178,8 +178,8 @@ function monPrice(t,p){if(typeof p!=='number')return '—';var d={'BTC':0,'NASDA
 function tickFit(){try{var el=document.getElementById('tickIn');el.style.setProperty('--mqd',Math.max(20,el.offsetWidth/50).toFixed(1)+'s');}catch(e){}}
 function tickDraw(d){try{var ORDER=['BTC','NASDAQ','S&P','USDKRW','KIMP','GOLD','US10Y','WTI','KOSPI'];var key=function(t){return t==='KOSPI 야간'?'KOSPI':t};
 var items=((d&&d.items)||[]).slice().sort(function(p,q){var i=ORDER.indexOf(key(p.t)),j=ORDER.indexOf(key(q.t));return(i<0?99:i)-(j<0?99:j)});
-var parts=items.map(function(x){var c=x.c,has=typeof c==='number'&&isFinite(c);var a=has?Math.abs(c*100).toFixed(1):'';var pct=!has?'—':(a==='0.0'?'':(c>0?'+':'-'))+a+'%';return monPrice(x.t,x.p)+' '+pct+' '+key(x.t).slice(0,3).toUpperCase()});
-if(!parts.length)return;document.getElementById('tickIn').textContent=parts.join(' / ');tickFit();}catch(e){}}
+var parts=items.map(function(x){var c=x.c,has=typeof c==='number'&&isFinite(c);var a=has?Math.abs(c*100).toFixed(1):'';var pct=!has?'—':(a==='0.0'?'':(c>0?'+':'-'))+a+'%';var col=!has||a==='0.0'?'#9aa3b2':(c>0?'#FF4D4F':'#3B82F6');return '<span style="color:'+col+'">'+(monPrice(x.t,x.p)+' '+pct+' '+key(x.t).slice(0,3).toUpperCase()).replace(/&/g,'&amp;')+'</span>'});
+if(!parts.length)return;document.getElementById('tickIn').innerHTML=parts.join(' <span style="color:#6b7280">/</span> ');tickFit();}catch(e){}}
 function tickLoad(){try{google.script.run.withSuccessHandler(tickDraw).withFailureHandler(function(){}).web_monitorData();}catch(e){}}
 tickLoad();setInterval(tickLoad,300000);window.addEventListener('resize',tickFit);
 window.sndToggle=sndToggle;

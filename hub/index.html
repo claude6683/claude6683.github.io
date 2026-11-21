@@ -1046,10 +1046,11 @@ function tickLoad() {
           const c = x.c, has = typeof c === 'number' && isFinite(c);
           const a = has ? Math.abs(c * 100).toFixed(1) : '';
           const pct = !has ? '—' : (a === '0.0' ? '' : (c > 0 ? '+' : '-')) + a + '%';
-          return monPrice(x.t, x.p) + ' ' + pct + ' ' + key(x.t).slice(0,3).toUpperCase();
+          const col = !has || a === '0.0' ? '#9aa3b2' : (c > 0 ? '#FF4D4F' : '#3B82F6');
+          return '<span style="color:' + col + '">' + (monPrice(x.t, x.p) + ' ' + pct + ' ' + key(x.t).slice(0,3).toUpperCase()).replace(/&/g, '&amp;') + '</span>';
         });
         if (!parts.length) return;
-        document.getElementById('tickIn').textContent = parts.join(' / ');
+        document.getElementById('tickIn').innerHTML = parts.join(' <span style="color:#6b7280">/</span> ');
         tickFit();
       } catch (e) {}
     }).withFailureHandler(() => {}).web_monitorData();
