@@ -6,13 +6,14 @@ var css=".tb{position:fixed;top:0;left:0;right:0;height:30px;z-index:9999;displa
 +".snd-btn.on{background:#1b1f2d;color:#fff;border-color:#fff}"
 +".snd-last{font-variant-numeric:tabular-nums;white-space:nowrap;padding:2px 4px;border-radius:4px}"
 +".snd-last.flash{animation:sndf .7s ease-out}@keyframes sndf{from{background:#fff1a8;color:#000}to{background:transparent}}"
++".bj{flex:none;margin:0 10px;font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}"
 +"#tick{flex:1;min-width:0;overflow:hidden;height:30px;line-height:30px;font-size:12px;font-weight:700;color:#FF4D4F;white-space:nowrap}"
 +"#tick i{font-style:normal;display:inline-block;padding-left:100%;animation:tickMarq var(--mqd,40s) linear infinite}"
 +"@keyframes tickMarq{from{transform:translateX(0)}to{transform:translateX(-100%)}}"
 +"body{padding-top:30px!important}@media(max-width:640px){.snd-last{display:none}}";
 var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 var bar=document.createElement('div');bar.className='tb';
-bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><div id="tick"><i id="tickIn"></i></div>';
+bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><span id="bjBox" class="bj"></span><div id="tick"><i id="tickIn"></i></div>';
 document.body.insertBefore(bar,document.body.firstChild);
 // ===== 큰 체결 소리 (BTC 무기한선물 100만 달러 이상 체결 시 종소리) =====
 // 바이낸스·바이비트·OKX 공개 체결 스트림을 직접 받아, 한 건이 기준 금액 이상이면 소리를 냄.
@@ -182,5 +183,7 @@ var parts=items.map(function(x){var c=x.c,has=typeof c==='number'&&isFinite(c);v
 if(!parts.length)return;document.getElementById('tickIn').innerHTML=parts.join(' <span style="color:#6b7280">/</span> ');tickFit();}catch(e){}}
 function tickLoad(){try{google.script.run.withSuccessHandler(tickDraw).withFailureHandler(function(){}).web_monitorData();}catch(e){}}
 tickLoad();setInterval(tickLoad,300000);window.addEventListener('resize',tickFit);
+function bjLoad(){try{fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/bj/bj.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var el=document.getElementById('bjBox');if(!el)return;var p=d&&d.pos;if(!p){el.textContent='';return;}var up=p.pnl>=0,lg=p.side==='LONG';var f=function(n,k){return Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:k})};el.innerHTML='<span style="color:#9aa3b2">웨돔</span> <span style="color:'+(lg?'#FF4D4F':'#3B82F6')+'">BTC '+(lg?'롱':'숏')+' '+f(p.size,0)+'</span> <span style="color:'+(up?'#FF4D4F':'#3B82F6')+'">'+(up?'+':'-')+f(p.pnl,0)+'</span>';}).catch(function(){});}catch(e){}}
+bjLoad();setInterval(bjLoad,60000);
 window.sndToggle=sndToggle;
 })();
