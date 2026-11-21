@@ -65,7 +65,7 @@
   </div>
   <div class="tools">
     <span class="lbl">그리기</span>
-    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
+    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
     <span class="lbl" id="cnote"></span>
   </div>
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
@@ -343,7 +343,7 @@ function redraw(){
 }
 
 // ---------- user drawings ----------
-let tool=null, pend=null, hover=null, hitD=null, drawings=[];
+let meas=null, tool=null, pend=null, hover=null, hitD=null, drawings=[];
 try{ const j=JSON.parse(localStorage.getItem('smc_draw')||'[]'); if(Array.isArray(j)) drawings=j; }catch(e){}
 function saveDraw(){ try{ localStorage.setItem('smc_draw', JSON.stringify(drawings)); }catch(e){} }
 function t2i(t){
@@ -367,6 +367,7 @@ function drawOne(d,L,prev,hl){
   if(d.type==='vline'){ cx.beginPath(); cx.moveTo(A.x,0); cx.lineTo(A.x,L.pb); cx.stroke(); cx.setLineDash([]); return; }
   const B=d.b?xy(d.b):null; if(!B){ cx.setLineDash([]); return; }
   if(d.type==='trend'){ cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); [A,B].forEach(q=>{ cx.beginPath(); cx.arc(q.x,q.y,3,0,6.3); cx.fill(); }); }
+  else if(d.type==='measure'){ cx.setLineDash([]); drawMeasure(d,A,B,L); return; }
   else if(d.type==='rect'){ cx.fillStyle='rgba(74,163,255,.12)'; cx.fillRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); cx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); }
   else if(d.type==='fib'){
     const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x);
@@ -379,11 +380,29 @@ function drawOne(d,L,prev,hl){
   }
   cx.setLineDash([]);
 }
+function fmtDur(sec){ sec=Math.abs(sec); const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60); return d?d+'일 '+h+'시간':h?h+'시간 '+m+'분':m+'분'; }
+function drawMeasure(d,A,B,L){
+  const dp=d.b.p-d.a.p, pct=(d.b.p/d.a.p-1)*100, up=dp>=0, col=up?'#34d399':'#ff6b6b';
+  const nb=Math.round(t2i(d.b.t)-t2i(d.a.t));
+  const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x), y1=Math.min(A.y,B.y), y2=Math.max(A.y,B.y), mx=(x1+x2)/2, my=(y1+y2)/2;
+  cx.fillStyle=up?'rgba(52,211,153,.15)':'rgba(255,107,107,.15)'; cx.fillRect(x1,y1,x2-x1,y2-y1);
+  cx.strokeStyle=col; cx.lineWidth=1; cx.setLineDash([]);
+  cx.beginPath(); cx.moveTo(x1,my); cx.lineTo(x2,my); cx.moveTo(mx,y1); cx.lineTo(mx,y2); cx.stroke();
+  const ah=(x,y,dx,dy)=>{ cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x-dx*7-dy*4,y-dy*7+dx*4); cx.moveTo(x,y); cx.lineTo(x-dx*7+dy*4,y-dy*7-dx*4); cx.stroke(); };
+  ah(mx,B.y,0,B.y>=A.y?1:-1); ah(B.x,my,B.x>=A.x?1:-1,0);
+  const l1=(dp>=0?'+':'')+fmtV(Math.abs(dp)).replace(/^/,dp<0?'-':'')+' ('+sgn(pct)+')', l2=nb+'봉 · '+fmtDur(d.b.t-d.a.t);
+  cx.font='bold 11px sans-serif'; const w=Math.max(cx.measureText(l1).width,cx.measureText(l2).width)+16, h=36;
+  let bx=Math.min(Math.max(mx-w/2,4),L.pl-w-4), by=up?y1-h-6:y2+6; by=Math.min(Math.max(by,4),L.pb-h-4);
+  cx.fillStyle=up?'#0f5f48':'#7a2b2b'; cx.strokeStyle=col; cx.fillRect(bx,by,w,h); cx.strokeRect(bx,by,w,h);
+  cx.fillStyle='#fff'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(l1,bx+w/2,by+11); cx.font='11px sans-serif'; cx.fillText(l2,bx+w/2,by+26);
+}
 function drawUser(L){
   if(!bars.length) return;
   cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
   drawings.forEach(d=>{ if(d.k===sym) drawOne(d,L,false,d===hitD); });
+  if(meas) drawOne({type:'measure',a:meas.a,b:meas.b},L,false,false);
   if(pend&&hover) drawOne({type:pend.type,a:pend.a,b:hover},L,true,false);
+  else if(hover&&(tool==='hline'||tool==='vline')) drawOne({type:tool,a:hover},L,true,false);
   cx.restore();
 }
 function evPos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
@@ -405,18 +424,24 @@ function hitTest(pos){
   return best;
 }
 function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncBtns(); redraw(); }
-cv.addEventListener('mousemove',e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); redrawSoon(); });
-cv.addEventListener('mouseleave',()=>{ hover=null; hitD=null; redrawSoon(); });
+cv.addEventListener('mousemove',e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); cross={x:pos.x,y:pos.y}; tipAt(pos); redrawSoon(); });
+cv.addEventListener('mouseleave',()=>{ hover=null; hitD=null; cross=null; tip.style.display='none'; redrawSoon(); });
+cv.addEventListener('wheel',e=>{   // 그리기 모드에서도 휠 줌 유지
+  e.preventDefault(); const pe=cv.style.pointerEvents; cv.style.pointerEvents='none';
+  const el=document.elementFromPoint(e.clientX,e.clientY); cv.style.pointerEvents=pe;
+  if(el) el.dispatchEvent(new WheelEvent('wheel',{clientX:e.clientX,clientY:e.clientY,deltaX:e.deltaX,deltaY:e.deltaY,deltaMode:e.deltaMode,bubbles:true,cancelable:true}));
+},{passive:false});
 cv.addEventListener('click',e=>{
   const pos=evPos(e);
   if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
   const pt=mkPt(pos); if(!pt||!tool) return;
   if(tool==='hline'||tool==='vline'){ drawings.push({k:sym,type:tool,a:pt}); finish(); return; }
-  if(!pend){ pend={type:tool,a:pt}; hover=pt; redraw(); return; }
+  if(!pend){ if(tool==='measure') meas=null; pend={type:tool,a:pt}; hover=pt; redraw(); return; }
+  if(pend.type==='measure'){ meas={a:pend.a,b:pt}; finish(); return; }
   drawings.push({k:sym,type:pend.type,a:pend.a,b:pt}); finish();
 });
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&(tool||pend)){ tool=null; pend=null; hover=null; syncBtns(); redraw(); } });
-$('dtools').addEventListener('click',e=>{ const d=e.target.dataset.d; if(!d) return; tool=tool===d?null:d; pend=null; hover=null; hitD=null; syncBtns(); redraw(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&(tool||pend||meas)){ meas=null; tool=null; pend=null; hover=null; syncBtns(); redraw(); } });
+$('dtools').addEventListener('click',e=>{ const bt=e.target.closest('button[data-d]'); const d=bt&&bt.dataset.d; if(!d) return; meas=null; tool=tool===d?null:d; pend=null; hover=null; hitD=null; syncBtns(); redraw(); });
 $('undo').onclick=()=>{ for(let i=drawings.length-1;i>=0;i--){ if(drawings[i].k===sym){ drawings.splice(i,1); break; } } saveDraw(); redraw(); };
 $('clr').onclick=()=>{ drawings=drawings.filter(d=>d.k!==sym); saveDraw(); redraw(); };
 
@@ -426,6 +451,8 @@ function drawCross(L){
   if(!cross) return;
   const v=cs.coordinateToPrice(cross.y); if(v===null||cross.y>L.pb||cross.y<0) return;
   const price=unconv(v), pct=(price/base-1)*100;
+  if(tool){ cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip(); cx.strokeStyle='rgba(139,147,167,.7)'; cx.lineWidth=1; cx.setLineDash([4,4]);
+    cx.beginPath(); cx.moveTo(0,cross.y); cx.lineTo(L.pl,cross.y); cx.moveTo(cross.x,0); cx.lineTo(cross.x,L.pb); cx.stroke(); cx.restore(); cx.setLineDash([]); }
   const t = ymode==='pct' ? sgn(pct) : fmtV(price)+'  '+sgn(pct);
   cx.font='bold 11px sans-serif'; const w=cx.measureText(t).width+12;
   const x0=L.W-w;
@@ -437,17 +464,25 @@ chart.subscribeCrosshairMove(p=>{
   if(!p.time||!p.point||p.point.x<0||p.point.y<0){ cross=null; tip.style.display='none'; redrawSoon(); return; }
   cross={x:p.point.x,y:p.point.y}; redrawSoon();
   const i=tIdx.get(p.time); if(i===undefined) { tip.style.display='none'; return; }
-  const b=bars[i], d=new Date(p.time*1000).toISOString(), title=cfg.intraday?d.slice(0,10)+' '+d.slice(11,16):d.slice(0,10);
-  const v=cs.coordinateToPrice(p.point.y), cp=v===null?null:unconv(v);
+  renderTip(i,p.point.x,p.point.y);
+});
+function tipAt(pos){
+  const lg=ts.coordinateToLogical(pos.x), i=lg===null?-1:Math.round(lg);
+  if(i<0||i>=bars.length){ tip.style.display='none'; return; }
+  renderTip(i,pos.x,pos.y);
+}
+function renderTip(i,px,py){
+  const b=bars[i], d=new Date(dT[i]*1000).toISOString(), title=cfg.intraday?d.slice(0,10)+' '+d.slice(11,16):d.slice(0,10);
+  const v=cs.coordinateToPrice(py), cp=v===null?null:unconv(v);
   const cls=x=>x>=0?'up':'dn', pc=(x)=>(x/base-1)*100;
   tip.innerHTML = `<div class="tt">${title}</div>`+
     `<div><span class="k">시/고/저/종</span>${fmtV(b.o)} / ${fmtV(b.h)} / ${fmtV(b.l)} / ${fmtV(b.c)}</div>`+
     `<div><span class="k">종가</span>${fmtV(b.c)} <b class="${cls(pc(b.c))}">${sgn(pc(b.c))}</b> <span style="color:var(--sub)">(오늘 종가 대비)</span></div>`+
     (cp===null?'':`<div><span class="k">커서</span>${fmtV(cp)} <b class="${cls(pc(cp))}">${sgn(pc(cp))}</b></div>`);
   tip.style.display='block';
-  const w=tip.offsetWidth, W=$('chart').clientWidth; let x=p.point.x+16; if(x+w>W-86) x=p.point.x-w-16;
+  const w=tip.offsetWidth, W=$('chart').clientWidth; let x=px+16; if(x+w>W-86) x=px-w-16;
   tip.style.left=Math.max(4,x)+'px'; tip.style.top='10px';
-});
+}
 ts.subscribeVisibleLogicalRangeChange(()=>redrawSoon());
 $('chartbox').addEventListener('mouseleave',()=>{ cross=null; tip.style.display='none'; redrawSoon(); });
 $('chartbox').addEventListener('dblclick',()=>{ if(!tool) resetView(); });
@@ -484,7 +519,7 @@ function syncBtns(){
   cv.classList.toggle('act',!!tool);
 }
 $('tfs').addEventListener('click',e=>{ const k=e.target.dataset.tf; if(k&&k!==tf){ tf=k; buildUI(); load(); } });
-$('legend').addEventListener('click',e=>{ const c=e.target.closest('.chip'); if(!c||c.dataset.k===sym) return; sym=c.dataset.k; pend=null; hover=null; buildUI(); load(); });
+$('legend').addEventListener('click',e=>{ const c=e.target.closest('.chip'); if(!c||c.dataset.k===sym) return; sym=c.dataset.k; meas=null; pend=null; hover=null; buildUI(); load(); });
 $('smcopts').addEventListener('click',e=>{
   const k=e.target.dataset.o; if(!k) return; on[k]=!on[k]; syncBtns();
   if(k==='trend' && bars.length) renderChart(false); else redraw();
