@@ -244,7 +244,7 @@ function point(i){
 }
 function setZero(){
   if(zeroLine){ try{ cs.removePriceLine(zeroLine); }catch(e){} zeroLine=null; }
-  zeroLine = cs.createPriceLine({price: ymode==='pct'?0:base, color:'#8b93a7', lineWidth:1, lineStyle:2, axisLabelVisible:true, title:'오늘 종가'});
+  zeroLine = cs.createPriceLine({price: ymode==='pct'?0:base, color:'#8b93a7', lineWidth:1, lineStyle:2, axisLabelVisible:false, title:''});
 }
 function renderChart(reset){
   const lr = reset ? null : ts.getVisibleLogicalRange();
