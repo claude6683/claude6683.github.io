@@ -50,7 +50,9 @@
   .wrap{max-width:none;padding:4px 6px 0}
   .top,.tools,#msg,footer,#rsibox,#tip,#draw{display:none!important}
   .legend{margin-bottom:4px;gap:5px}
-  .chip{padding:2px 7px;font-size:11px}
+  .chip{padding:2px 6px;font-size:10px;gap:4px;white-space:nowrap}
+  .chip .base{display:none}
+  .legend{flex-wrap:nowrap!important;overflow:hidden}
   #chart{height:calc(100vh - 40px)!important;min-height:0;border:0;border-radius:0}
 </style>
 </head>
@@ -94,11 +96,8 @@ const KST = 32400;
 const DATA_URL = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/data/data.json';
 const ASSETS = [
   {k:'BTC',  color:'#f7931a', w:3,   src:'bn', sym:'BTCUSDT', base:true},
-  {k:'QQQM', color:'#4aa3ff', w:1.5, src:'yf'},
-  {k:'VOO',  color:'#a78bfa', w:1.5, src:'yf'},
-  {k:'GOLD', color:'#facc15', w:1.5, src:'bn', sym:'PAXGUSDT'},
   {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
-  {k:'XYZ100', color:'#f472b6', w:1.5, src:'hl', sym:'xyz:XYZ100'},
+  {k:'XYZ100', label:'XYZ', color:'#f472b6', w:1.5, src:'hl', sym:'xyz:XYZ100'},
 ];
 const TF = {
   '1H':  {b:'1m',  lim:60,   sec:60,     span:3600,           key:'1H'},
@@ -315,7 +314,7 @@ $('clr').onclick = ()=>{ drawings=drawings.filter(d=>d.k!==target); saveDraw(); 
 function buildUI(){
   $('tfs').innerHTML = Object.keys(TF).map(k=>`<button data-tf="${k}" class="${k===tf?'on':''}">${k}</button>`).join('');
   $('legend').innerHTML = ASSETS.map(a=>
-    `<div class="chip" data-k="${a.k}"><span class="dot" style="background:${a.color}"></span><b>${a.k}</b>${a.base?'<span class="base">기준</span>':''}<span class="pr"></span><span class="pc"></span></div>`).join('');
+    `<div class="chip" data-k="${a.k}"><span class="dot" style="background:${a.color}"></span><b>${a.label||a.k}</b>${a.base?'<span class="base">기준</span>':''}<span class="pr"></span><span class="pc"></span></div>`).join('');
 }
 $('tfs').addEventListener('click', e=>{ const k=e.target.dataset.tf; if(k&&k!==tf){tf=k; buildUI(); bindChips(); load();} });
 function bindChips(){
@@ -388,18 +387,18 @@ async function load(){
       // 1D: 가장 최근 주식 거래일 시작부터 지금까지 (주말엔 금요일 장 ~ 현재)
       const now = Date.now()/1000;
       let lastT = 0;
-      ['QQQM','VOO','SCHD'].forEach(k=>{ const a = stockData&&stockData['2D']&&stockData['2D'][k]; if(a&&a.length) lastT=Math.max(lastT,a[a.length-1][0]); });
+      ['SCHD'].forEach(k=>{ const a = stockData&&stockData['2D']&&stockData['2D'][k]; if(a&&a.length) lastT=Math.max(lastT,a[a.length-1][0]); });
       const startT = (lastT && now-lastT < 5*86400) ? lastT-20*3600 : now-86400;
       cfg = Object.assign({}, cfg, {lim: Math.min(1000, Math.max(60, Math.ceil((now-startT)/300)+3))});
     }
     curCfg = cfg;
-    const [bt, gd] = await Promise.all([fetchBinance('BTCUSDT',cfg), fetchBinance('PAXGUSDT',cfg)]);
+    const bt = await fetchBinance('BTCUSDT',cfg);
     if(id!==loadId) return;
     const btc = bt.c;
-    raw.BTC = btc; raw.GOLD = gd.c; ohlc.BTC = bt.o; ohlc.GOLD = gd.o;
+    raw.BTC = btc; ohlc.BTC = bt.o;
     try{ const xz = await fetchHL('xyz:XYZ100',cfg); if(id!==loadId) return; raw.XYZ100 = xz.c; ohlc.XYZ100 = xz.o; }catch(e){ raw.XYZ100 = []; ohlc.XYZ100 = []; }
     const st = cfg.dyn ? (btc.length ? btc[0][0] : 0) : Date.now()/1000 - cfg.span;
-    ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
+    ['SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
     renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
     openWS(cfg);
   }catch(e){
@@ -408,14 +407,14 @@ async function load(){
 }
 function setMsg(){
   const t = stockUpdated ? new Date((stockUpdated+KST)*1000).toISOString().slice(5,16).replace('T',' ') : null;
-  const miss = ['QQQM','VOO','SCHD'].every(k=>!raw[k]||!raw[k].length);
+  const miss = ['SCHD'].every(k=>!raw[k]||!raw[k].length);
   $('msg').textContent = miss ? '주식 데이터 준비 중입니다 (서버 첫 갱신 대기). BTC·GOLD는 실시간입니다.'
     : `주식 마지막 갱신: ${t} (KST) · BTC·GOLD 실시간 수신 중`;
 }
 setInterval(async ()=>{
   if(await fetchStocks()){
     const cfg=curCfg, st = cfg.dyn ? (raw.BTC&&raw.BTC.length?raw.BTC[0][0]:0) : Date.now()/1000 - cfg.span;
-    ['QQQM','VOO','SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
+    ['SCHD'].forEach(k=>{ raw[k]=stockSeries(k,cfg,st); renderOne(k); });
     renderExtras(); setMsg();
   }
 }, 60000);
@@ -435,12 +434,12 @@ let pending = {}, flushT = null;
 function closeWS(){ clearTimeout(wsTimer); clearTimeout(wsTimer2); if(ws2){ ws2.onclose=null; try{ws2.close();}catch(e){} ws2=null; } if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
 function openWS(cfg){
   closeWS();
-  const url = `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_${cfg.b}/paxgusdt@kline_${cfg.b}`;
+  const url = `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_${cfg.b}`;
   const myId = loadId;
   ws = new WebSocket(url);
   ws.onmessage = ev=>{
     const m = JSON.parse(ev.data).data; if(!m||!m.k) return;
-    const k = m.s==='BTCUSDT'?'BTC':'GOLD', arr = raw[k]; if(!arr||!arr.length) return;
+    const k = 'BTC', arr = raw[k]; if(!arr||!arr.length) return;
     const t = bucket(Math.floor(m.k.t/1000),cfg), v = parseFloat(m.k.c), last = arr[arr.length-1];
     if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
     const oa = ohlc[k];

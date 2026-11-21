@@ -55,12 +55,19 @@
   .at{text-align:center;color:#6b7280;font-size:11px;padding:6px 0 2px}
   /* B-3 뉴스 표 / B-4 시세표 */
   table{border-collapse:separate;border-spacing:0;font-size:13px;width:100%}
-  th{background:#1b1f2d;color:#fff;font-weight:700;padding:7px 8px;text-align:center;white-space:nowrap;position:sticky;top:0}
-  td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:middle;background:#fff;color:#212633}
+  th{background:linear-gradient(180deg,#252b3d,#1b1f2d);color:#cfd6e6;font-weight:700;font-size:12px;letter-spacing:.2px;padding:9px 10px;text-align:center;white-space:nowrap;position:sticky;top:0;border-bottom:1px solid #343b50}
+  td{border-bottom:1px solid #22262f;padding:8px 10px;vertical-align:middle;background:var(--card);color:var(--tx)}
+  tbody tr:nth-child(even) td{background:#1c2028}
+  tbody tr:hover td{background:#232936}
   td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.nm{font-weight:700;color:#fff}
   td svg{display:block;width:100%}
-  td a{color:#212633;text-decoration:none}
+  td a{color:var(--tx);text-decoration:none}
   td a:hover{text-decoration:underline}
+  td.pc{text-align:center;font-weight:700;font-variant-numeric:tabular-nums}
+  td.pc.u{background:rgba(232,50,60,.14)!important;color:#ff6b75}
+  td.pc.d{background:rgba(47,107,219,.18)!important;color:#6ea0ff}
+  td.cd{color:#7f8793;font-size:11px}
   .cat{display:inline-block;font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;white-space:nowrap}
   .tw{background:var(--card);height:100%;overflow:auto}
   .it.nw{cursor:default}
@@ -287,18 +294,19 @@ function drawTable(){
     const code = (r[8].t||'').trim(), cur = parseFloat(String(r[1].t||'').replace(/,/g,'')), low = LOWS[code];
     h += '<tr>';
     r.forEach((cell,c)=>{
-      const t = (cell.t||'').trim(); let cls = '';
-      if(/^[+\-−]?[\d,]*\.?\d+%?$/.test(t) && !cell.a) cls = ' class="num"';
-      let st = cst(cell);
-      if(/^\+\d[\d,.]*%$/.test(t)) st += 'color:'+s.up+';';
-      if(/^[-−]\d[\d,.]*%$/.test(t) && !/^[-−]0(\.0+)?%$/.test(t)) st += 'color:'+s.down+';';
-      const inner = cell.s ? spark(cell.s,cell.sc,cell.sh) : esc(cell.t||'');
-      h += '<td'+cls+(st||cell.s?' style="'+(cell.s?'padding:4px 6px;':'')+st+'"':'')+'>'+inner+'</td>';
+      const t = (cell.t||'').trim();
+      if(cell.s){ h += '<td style="padding:4px 8px">'+spark(cell.s,cell.sc,cell.sh)+'</td>'; }
+      else if(c===0){ h += '<td class="nm">'+esc(t)+'</td>'; }
+      else if(c===1){ h += '<td class="num">'+esc(t)+'</td>'; }
+      else if(/^[+\-−]\d[\d,.]*%$/.test(t) || /^0(\.0+)?%$/.test(t)){
+        const z = /^[+\-−]?0(\.0+)?%$/.test(t), up = t[0]==='+';
+        h += '<td class="pc'+(z?'':up?' u':' d')+'">'+esc(t)+'</td>';
+      } else { h += '<td class="'+(c===8?'cd':'')+'" style="text-align:'+(c===9?'center':'left')+'">'+esc(t)+'</td>'; }
       if(c===NEWC){
         if(cur>0 && low>0){
           const p = (cur/low-1)*100, up = p>0.005;
-          h += '<td style="text-align:center;font-weight:700;background:'+(up?'#ffeef0':'#eaf2ff')+';color:'+(up?s.up:s.down)+'">'+(up?'+':'')+p.toFixed(2)+'%</td>';
-        } else h += '<td style="text-align:center;color:#99a0ad">—</td>';
+          h += '<td class="pc '+(up?'u':'d')+'">'+(up?'+':'')+p.toFixed(2)+'%</td>';
+        } else h += '<td class="pc" style="color:#7f8793">—</td>';
       }
     });
     h += '</tr>';
