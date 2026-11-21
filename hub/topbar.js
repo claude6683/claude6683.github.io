@@ -13,7 +13,7 @@ var css=".tb{position:fixed;top:0;left:0;right:0;height:30px;z-index:9999;displa
 +"body{padding-top:30px!important}@media(max-width:640px){.snd-last{display:none}}";
 var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 var bar=document.createElement('div');bar.className='tb';
-bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><span id="bjBox" class="bj"></span><div id="tick"><i id="tickIn"></i></div>';
+bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><span id="xyzBox" class="bj"></span><span id="bjBox" class="bj"></span><div id="tick"><i id="tickIn"></i></div>';
 document.body.insertBefore(bar,document.body.firstChild);
 // ===== 큰 체결 소리 (BTC 무기한선물 100만 달러 이상 체결 시 종소리) =====
 // 바이낸스·바이비트·OKX 공개 체결 스트림을 직접 받아, 한 건이 기준 금액 이상이면 소리를 냄.
@@ -185,5 +185,8 @@ function tickLoad(){try{google.script.run.withSuccessHandler(tickDraw).withFailu
 tickLoad();setInterval(tickLoad,300000);window.addEventListener('resize',tickFit);
 function bjLoad(){try{fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/bj/bj.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var el=document.getElementById('bjBox');if(!el)return;var p=d&&d.pos;if(!p){el.textContent='';return;}var up=p.pnl>=0,lg=p.side==='LONG';var f=function(n,k){return Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:k})};el.innerHTML='<span style="color:#9aa3b2">웨돔</span> <span style="color:'+(lg?'#FF4D4F':'#3B82F6')+'">BTC '+(lg?'롱':'숏')+' '+f(p.size,0)+'</span> <span style="color:'+(up?'#FF4D4F':'#3B82F6')+'">'+(up?'+':'-')+f(p.pnl,0)+'</span>';}).catch(function(){});}catch(e){}}
 bjLoad();setInterval(bjLoad,60000);
+// XYZ100 (Hyperliquid XYZ100USDC.P) 시세: 소수점 없음 + 전일 대비 ±% (상승 빨강/하락 파랑)
+function xyzLoad(){try{fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'metaAndAssetCtxs',dex:'xyz'})}).then(function(r){return r.json()}).then(function(d){var i=d[0].universe.findIndex(function(u){return u.name==='xyz:XYZ100'});if(i<0)return;var c=d[1][i],p=+c.markPx,pv=+c.prevDayPx;if(!(p>0)||!(pv>0))return;var pc=(p/pv-1)*100,up=pc>=0,el=document.getElementById('xyzBox');if(!el)return;el.innerHTML='<span style="color:'+(up?'#FF4D4F':'#3B82F6')+'">'+Math.floor(p).toLocaleString('en-US')+' '+(up?'+':'-')+Math.abs(pc).toFixed(2)+'%</span>';}).catch(function(){});}catch(e){}}
+xyzLoad();setInterval(xyzLoad,10000);
 window.sndToggle=sndToggle;
 })();
