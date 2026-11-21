@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<base target="_blank">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d4f74">
+<title>충남 선상 빈자리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+</head><body>
+<style>
+:root{
+--bg:#f3f6f8; --surface:#ffffff; --ink:#0f2433; --muted:#5b6f7d; --line:#d9e2e8;
+--sea:#0d4f74; --sea-soft:#e2eef5; --buoy:#e8601c; --buoy-soft:#fdebe1;
+--ok:#1d8a5b; --warn:#c27a00; --sat:#2a62c9; --sun:#d23b3b;
+--f-display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
+--f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+--f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+--bg:#0b1820; --surface:#11222d; --ink:#e6eef3; --muted:#93a8b6; --line:#22394a;
+--sea:#6fb6dd; --sea-soft:#15303f; --buoy:#ff8a4c; --buoy-soft:#3a2216;
+--ok:#4cc38a; --warn:#e3a53a; --sat:#7aa7ff; --sun:#ff7b7b; color-scheme:dark}}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;margin:0;
+padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,6vw,40px);line-height:1.05;margin:0;letter-spacing:-.01em;text-wrap:balance}
+h1 em{font-style:normal;color:var(--buoy)}
+.sub{color:var(--muted);font-size:13px;margin-top:6px}
+.sync{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:0}
+.sync small{color:var(--muted);font-size:12px;text-align:right}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--sea);background:var(--sea);color:var(--surface);border-radius:8px;padding:8px 14px;font-weight:600;font-size:14px}
+.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,.chip:focus-visible,.day:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--buoy);outline-offset:2px}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.days{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.day{flex:0 0 auto;width:74px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 6px;text-align:center;color:var(--ink);display:flex;flex-direction:column;gap:2px}
+.day .dw{font-size:12px;color:var(--muted)}
+.day.sat .dw{color:var(--sat)} .day.sun .dw{color:var(--sun)}
+.day .dd{font-family:var(--f-display);font-size:22px;line-height:1}
+.day .tide{font-size:11px;color:var(--muted)}
+.day .cnt{font-family:var(--f-mono);font-size:12px;font-weight:600;color:var(--ok)}
+.day .cnt.none{color:var(--muted);font-weight:500}
+.day[aria-pressed="true"]{border-color:var(--sea);background:var(--sea-soft);box-shadow:inset 0 -3px 0 var(--sea)}
+.filters{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.frow{display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.flabel{flex:0 0 44px;font-size:12px;font-weight:600;color:var(--muted);padding-top:6px;letter-spacing:.02em}
+.chips{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+.chip{border:1px solid var(--line);background:transparent;color:var(--ink);border-radius:999px;padding:5px 11px;font-size:13px}
+.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.chip .n{font-family:var(--f-mono);font-size:11px;opacity:.7;margin-left:4px}
+select{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:5px 8px}
+.summary{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:baseline;font-size:14px}
+.summary b{font-family:var(--f-mono);font-size:20px;color:var(--sea)}
+.summary .note{color:var(--muted);font-size:12px;margin-left:auto}
+.list{display:flex;flex-direction:column;gap:8px}
+.boat{display:grid;grid-template-columns:64px 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.time{font-family:var(--f-mono);font-weight:600;font-size:16px;line-height:1.2}
+.time small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+.info{min-width:0;display:flex;flex-direction:column;gap:3px}
+.name{font-weight:700;font-size:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.port{font-size:13px;color:var(--muted)}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:11.5px;padding:1px 7px;border-radius:5px;background:var(--sea-soft);color:var(--sea);font-weight:600}
+.tag.f{background:var(--buoy-soft);color:var(--buoy)}
+.seat{display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:96px}
+.remain{font-family:var(--f-mono);font-weight:600;font-size:13px;color:var(--muted)}
+.remain b{font-size:24px;color:var(--ok)}
+.remain.low b{color:var(--warn)}
+.gauge{display:flex;gap:2px;flex-wrap:wrap;justify-content:flex-end;max-width:120px}
+.gauge i{width:6px;height:10px;border-radius:2px;background:var(--line)}
+.gauge i.on{background:var(--ok)}
+.remain.low + .gauge i.on{background:var(--warn)}
+.price{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.go{font-size:13px;font-weight:600;color:var(--sea);text-decoration:none;border-bottom:1px solid currentColor}
+.empty,.notice{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:24px;text-align:center;color:var(--muted)}
+.notice{border-style:solid;text-align:left;font-size:13px;padding:12px 14px}
+.notice.err{border-color:var(--buoy);color:var(--ink)}
+.prog{height:4px;background:var(--line);border-radius:2px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--buoy);width:0;transition:width .3s}
+.pinned{display:flex;flex-direction:column;gap:8px}
+.pinned:empty{display:none}
+.pinhead{font-size:12px;font-weight:700;color:var(--buoy);letter-spacing:.04em}
+.boat.pin{border-color:var(--buoy);box-shadow:inset 3px 0 0 var(--buoy)}
+.boat.closed{opacity:.72}
+.boat.closed .remain b{color:var(--muted)}
+.badge{font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--line);color:var(--muted)}
+.badge.open{background:var(--ok);color:var(--surface)}
+.boat.none{grid-template-columns:1fr;color:var(--muted);font-size:13px}
+footer{color:var(--muted);font-size:12px;line-height:1.6}
+.back{font-size:13px}
+@media (max-width:560px){
+.boat{grid-template-columns:52px 1fr;}
+.seat{grid-column:1 / -1;flex-direction:row;align-items:center;justify-content:space-between;min-width:0}
+.gauge{max-width:none;justify-content:flex-start;flex:1}
+.sync{align-items:flex-start}.btnrow{justify-content:flex-start}.sync small{text-align:left}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<div class="wrap">
+<header>
+<div>
+<h1>충남 선상 <em>빈자리</em></h1>
+<div class="sub">쭈꾸미 · 갑오징어 · 문어 · 참돔 · 우럭 — 예약 가능한 배만 모았습니다 (선상24 기준)</div>
+</div>
+<div class="sync">
+<div class="btnrow">
+<button class="btn" id="btnReload" type="button">새로고침</button>
+</div>
+<small id="syncInfo">데이터 불러오는 중…</small>
+</div>
+</header>
+<div class="prog" id="prog" hidden><i id="progBar"></i></div>
+<div id="notice"></div>
+<nav class="days" id="days" aria-label="날짜 선택"></nav>
+<section class="filters" aria-label="필터">
+<div class="frow"><span class="flabel">항구</span><div class="chips" id="portChips"></div></div>
+<div class="frow"><span class="flabel">어종</span><div class="chips" id="fishChips"></div></div>
+<div class="frow"><span class="flabel">조건</span>
+<div class="chips">
+<select id="minSeat" aria-label="최소 남은자리">
+<option value="1">남은자리 1명+</option><option value="2">2명+</option><option value="3">3명+</option><option value="4">4명+</option><option value="6">6명+</option>
+</select>
+<select id="slot" aria-label="출항 시간대">
+<option value="all">시간대 전체</option><option value="am">새벽·오전 출항</option><option value="pm">오후 출항 (반나절)</option>
+</select>
+<select id="sort" aria-label="정렬">
+<option value="time">출항시간순</option><option value="remain">남은자리 많은순</option><option value="price">가격 낮은순</option>
+</select>
+</div>
+</div>
+</section>
+<section class="pinned" id="pinned" aria-label="고정한 배"></section>
+<div class="summary" id="summary"></div>
+<div class="list" id="list"></div>
+<footer>
+물때는 서해 기준(7물때식)으로 음력에서 계산한 값입니다. 자리 수는 수집 시점 기준이라 실제와 다를 수 있으니 예약 전 선상24에서 꼭 확인하세요.<br>
+빈자리 정보는 GitHub 서버가 1시간마다 자동으로 선상24에서 가져옵니다 (PC·Claude 없이 동작).<br>
+<a class="back" href="../" target="_self">← #6683 홈</a>
+</footer>
+</div>
+<script>
+window.onerror=function(msg,src,l,col){var d=document.createElement('pre');d.id='fishErr';d.style.cssText='color:#c00;white-space:pre-wrap;font-size:12px';d.textContent='오류: '+msg+' ('+l+':'+col+')';document.body.insertBefore(d,document.body.firstChild)};
+</script>
+<script>
+(function(){
+const DATA_URL='https://raw.githubusercontent.com/claude6683/claude6683.github.io/fishing-data/fishing.json';
+const PORTS=[
+{k:'janggo',label:'장고항',re:/장고/},
+{k:'samgil',label:'삼길포',re:/삼길포/},
+{k:'etc',label:'기타 충남',re:null}
+];
+const DEFAULT_PORTS=['janggo','samgil'];
+const EXCLUDE=/신진도|마도|안흥|오천|대천|무창포|방포|영목|마검포|구매|내포|나암|라암|대야도|당암|백사장|가경주|탄개|드르니|황도|정당|창기|안면|몽산포|선녀/;
+const FISH=[{k:'jjuk',label:'쭈꾸미',re:/주꾸미|쭈꾸미/},{k:'gap',label:'갑오징어',re:/갑오징어/},{k:'mun',label:'문어',re:/문어/},{k:'chamdom',label:'참돔',re:/참돔/},{k:'urok',label:'우럭',re:/우럭/}];
+const PIN=[{no:515,name:'라이즈호'},{no:1080,name:'뉴시아호'}];
+const PIN_NOS=new Set(PIN.map(p=>p.no));
+const WD=['일','월','화','수','목','금','토'];
+const NDAYS=7;
+const $=id=>document.getElementById(id);
+const state={pins:{},day:null,ports:new Set(DEFAULT_PORTS),fish:new Set(FISH.map(f=>f.k)),minSeat:1,slot:'all',sort:'time',docs:{},busy:false};
+try{const s=JSON.parse(localStorage.getItem('seatfinder')||'null'); if(s){ if(s.ports) state.ports=new Set(s.ports); if(s.fish){ state.fish=new Set(s.fish); const known=new Set(s.fishAll||['jjuk','gap','mun','chamdom']); FISH.forEach(f=>{if(!known.has(f.k))state.fish.add(f.k)}); } if(s.minSeat) state.minSeat=s.minSeat; if(s.slot) state.slot=s.slot; if(s.sort) state.sort=s.sort; }}catch(e){}
+function save(){try{localStorage.setItem('seatfinder',JSON.stringify({ports:[...state.ports],fish:[...state.fish],fishAll:FISH.map(f=>f.k),minSeat:state.minSeat,slot:state.slot,sort:state.sort}))}catch(e){}}
+
+function kstToday(){const d=new Date(Date.now()+9*3600e3);return d.toISOString().slice(0,10)}
+function addDays(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
+function dayDiff(a,b){return Math.round((new Date(b+'T00:00:00Z')-new Date(a+'T00:00:00Z'))/864e5)}
+const dates=[];{const t=kstToday();for(let i=0;i<NDAYS;i++)dates.push(addDays(t,i))}
+state.day=dates[0];
+
+const NEW_MOONS=['2026-09-11','2026-10-11','2026-11-09','2026-12-09','2027-01-08','2027-02-07','2027-03-08','2027-04-07','2027-05-06'];
+function lunarDay(iso){let base=null;for(const n of NEW_MOONS){if(n<=iso)base=n}
+if(!base){const ref='2026-10-11';const k=dayDiff(ref,iso);return ((Math.floor(k%29.53)+30)%30)+1}
+return dayDiff(base,iso)+1}
+function multtae(iso){const L=lunarDay(iso);if(L===8||L===23)return '조금';if(L===9||L===24)return '무시';return (((L-10)%15+15)%15+1)+'물'}
+
+function rowObj(r,date){return{sid:r[0],shipNo:r[1],name:r[2],area:r[3],port:r[4],fish:r[5]||'',st:r[6],et:r[7],remain:r[8],cap:r[9],price:r[10],method:r[11]||'',date}}
+function portKey(p){for(const g of PORTS){if(g.re&&g.re.test(p))return g.k}return 'etc'}
+function rowsFor(date){const d=state.docs[date];if(!d||!Array.isArray(d.rows))return null;const seen=new Set();const out=[];
+for(const r of d.rows){if(seen.has(r[0])||PIN_NOS.has(r[1])||EXCLUDE.test(r[4]||'')||!r[6]||r[6]==='00:00')continue;seen.add(r[0]);const o=rowObj(r,date);o.pk=portKey(o.port);out.push(o)}return out}
+function matchFish(o){return FISH.some(f=>state.fish.has(f.k)&&f.re.test(o.fish))}
+function slotOf(o){if(!o.st||o.st==='00:00')return 'unk';const h=+o.st.slice(0,2);return h>=11?'pm':'am'}
+function filtered(date,ignorePorts){const rows=rowsFor(date);if(!rows)return null;
+return rows.filter(o=>(ignorePorts||state.ports.has(o.pk))&&matchFish(o)&&o.remain>=state.minSeat&&(state.slot==='all'||slotOf(o)===state.slot))}
+
+function renderDays(){const el=$('days');el.innerHTML='';
+for(const d of dates){const dt=new Date(d+'T00:00:00Z');const w=dt.getUTCDay();const f=filtered(d);
+const b=document.createElement('button');b.type='button';b.className='day'+(w===6?' sat':w===0?' sun':'');b.setAttribute('aria-pressed',String(d===state.day));
+const cnt=f?('<span class="cnt">'+f.length+'척</span>'):'<span class="cnt none">미수집</span>';
+b.innerHTML='<span class="dw">'+(d===dates[0]?'오늘':(dt.getUTCMonth()+1)+'/'+dt.getUTCDate())+' '+WD[w]+'</span><span class="dd">'+dt.getUTCDate()+'</span><span class="tide">'+multtae(d)+'</span>'+cnt;
+b.onclick=()=>{state.day=d;render()};el.appendChild(b)}
+const sel=el.querySelector('[aria-pressed="true"]');if(sel&&sel.scrollIntoView)try{sel.scrollIntoView({block:'nearest',inline:'nearest'})}catch(e){}}
+function renderChips(){const all=rowsFor(state.day)||[];
+const pc=$('portChips');pc.innerHTML='';
+for(const g of PORTS){const n=all.filter(o=>o.pk===g.k&&matchFish(o)&&o.remain>=state.minSeat).length;
+const b=document.createElement('button');b.type='button';b.className='chip';b.setAttribute('aria-pressed',String(state.ports.has(g.k)));
+b.innerHTML=g.label+'<span class="n">'+n+'</span>';b.onclick=()=>{state.ports.has(g.k)?state.ports.delete(g.k):state.ports.add(g.k);save();render()};pc.appendChild(b)}
+const fc=$('fishChips');fc.innerHTML='';
+for(const f of FISH){const b=document.createElement('button');b.type='button';b.className='chip';b.setAttribute('aria-pressed',String(state.fish.has(f.k)));
+b.textContent=f.label;b.onclick=()=>{state.fish.has(f.k)?state.fish.delete(f.k):state.fish.add(f.k);save();render()};fc.appendChild(b)}
+$('minSeat').value=String(state.minSeat);$('slot').value=state.slot;$('sort').value=state.sort}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function fmtPrice(p){return p>0?(p/10000).toLocaleString('ko-KR')+'만원':'가격문의'}
+function renderList(){const list=$('list'),sum=$('summary');list.innerHTML='';
+const f=filtered(state.day);
+const dt=new Date(state.day+'T00:00:00Z');const label=(dt.getUTCMonth()+1)+'월 '+dt.getUTCDate()+'일 ('+WD[dt.getUTCDay()]+') · '+multtae(state.day);
+if(!f){sum.innerHTML='<span>'+label+'</span>';list.innerHTML='<div class="empty">이 날짜는 아직 수집되지 않았어요.<br>서버가 1시간마다 자동으로 모아요.</div>';return}
+const seats=f.reduce((a,o)=>a+o.remain,0);
+const doc=state.docs[state.day];const at=doc&&doc.updatedAt?new Date(doc.updatedAt):null;
+sum.innerHTML='<span>'+label+'</span><span><b>'+f.length+'</b>척</span><span>남은자리 <b>'+seats+'</b>석</span><span class="note">'+(at?'수집 '+at.toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'')+'</span>';
+if(!f.length){list.innerHTML='<div class="empty">조건에 맞는 빈자리가 없어요. 항구나 어종 필터를 넓혀 보세요.</div>';return}
+const s=[...f];
+if(state.sort==='remain')s.sort((a,b)=>b.remain-a.remain||a.st.localeCompare(b.st));
+else if(state.sort==='price')s.sort((a,b)=>(a.price||9e9)-(b.price||9e9)||a.st.localeCompare(b.st));
+else s.sort((a,b)=>(a.st==='00:00'?'99':a.st).localeCompare(b.st==='00:00'?'99':b.st)||b.remain-a.remain);
+const frag=document.createDocumentFragment();
+for(const o of s)frag.appendChild(boatEl(o));
+list.appendChild(frag)}
+function boatEl(o,pin){const low=o.remain<=2;const unk=o.st==='00:00';const closed=pin&&(o.status!=='ING'||o.remain<=0);
+const badge=pin?('<span class="badge'+(closed?'':' open')+'">'+esc(closed?(o.statusName||'예약마감'):'예약가능')+'</span>'):'';
+const fishTags=o.fish.split(',').filter(Boolean).map(x=>'<span class="tag'+(FISH.some(f=>f.re.test(x))?' f':'')+'">'+esc(x)+'</span>').join('');
+const methodTag=o.method?('<span class="tag">'+esc(o.method.split(',').slice(0,3).join('·'))+'</span>'):'';
+const dots=Array.from({length:Math.min(o.cap,30)},(_,i)=>'<i class="'+(i<o.remain?'on':'')+'"></i>').join('');
+const url='https://www.sunsang24.com/ship/list/?ship_no='+o.shipNo+'&sdate='+o.date;
+const el=document.createElement('article');el.className='boat'+(pin?' pin':'')+(closed?' closed':'');
+el.innerHTML='<div class="time">'+(unk?'문의':esc(o.st))+'<small>'+(unk?'시간 미정':'~ '+esc(o.et))+'</small></div>\n<div class="info"><div class="name">'+esc(o.name)+badge+'</div><div class="port">'+esc(o.area)+' · '+esc(o.port)+'</div><div class="tags">'+fishTags+methodTag+'</div></div>\n<div class="seat"><div class="remain'+(low?' low':'')+'"><b>'+o.remain+'</b> / '+o.cap+'석</div><div class="gauge" aria-hidden="true">'+dots+'</div>\n<div class="price">'+fmtPrice(o.price)+' · <a class="go" href="'+url+'" target="_blank" rel="noopener">'+(closed?'일정 보기':'예약하기')+'</a></div></div>';
+return el}
+function renderPinned(){const box=$('pinned');box.innerHTML='';const d=state.pins[state.day];
+const head=document.createElement('div');head.className='pinhead';head.textContent='고정 · 라이즈호 · 뉴시아호';box.appendChild(head);
+const rows=d&&Array.isArray(d.rows)?d.rows.map(r=>Object.assign(rowObj(r,state.day),{status:r[12],statusName:r[13]})):[];
+rows.sort((a,b)=>PIN.findIndex(p=>p.no===a.shipNo)-PIN.findIndex(p=>p.no===b.shipNo)||a.st.localeCompare(b.st));
+for(const p of PIN){const mine=rows.filter(o=>o.shipNo===p.no);
+if(mine.length){mine.forEach(o=>box.appendChild(boatEl(o,true)))}
+else{const el=document.createElement('article');el.className='boat pin none';el.innerHTML='<div><b style="color:var(--ink)">'+esc(p.name)+'</b> · '+(d?'이 날 등록된 출조 일정이 없어요':'아직 수집 전이에요')+'</div>';box.appendChild(el)}}}
+function renderSync(){const ups=dates.map(d=>state.docs[d]&&state.docs[d].updatedAt).filter(Boolean).sort();
+const n=dates.filter(d=>state.docs[d]).length;
+$('syncInfo').textContent=ups.length?(n+'/'+NDAYS+'일 수집됨 · 최근 '+new Date(ups[ups.length-1]).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):'아직 수집된 데이터가 없어요';
+$('btnReload').disabled=state.busy}
+function render(){renderDays();renderChips();renderPinned();renderList();renderSync()}
+function notice(html,err){$('notice').innerHTML=html?('<div class="notice'+(err?' err':'')+'">'+html+'</div>'):''}
+$('minSeat').onchange=e=>{state.minSeat=+e.target.value;save();render()};
+$('slot').onchange=e=>{state.slot=e.target.value;save();render()};
+$('sort').onchange=e=>{state.sort=e.target.value;save();render()};
+render();
+
+function load(){if(state.busy)return;state.busy=true;renderSync();$('syncInfo').textContent='불러오는 중…';
+fetch(DATA_URL+'?t='+Date.now(),{cache:'no-store'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})
+.then(j=>{state.docs=j.days||{};state.pins=j.pinned||{};notice('');
+if(j.error)notice('최근 수집 중 문제: '+esc(j.error),true);state.busy=false;render()})
+.catch(e=>{notice('데이터를 불러오지 못했어요 ('+esc((e&&e.message)||String(e))+'). 잠시 뒤 새로고침해 주세요.',true);state.busy=false;render()})}
+$('btnReload').onclick=load;
+load();setInterval(load,10*60e3);
+})();
+</script>
+</body></html>
