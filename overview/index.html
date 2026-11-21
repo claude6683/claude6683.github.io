@@ -75,7 +75,7 @@
   <div id="rsibox"><div id="rsi"></div></div>
   <div id="msg"></div>
   <footer>
-    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
+    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · XYZ100: Hyperliquid(XYZ100USDC.P) 실시간, 주말에도 나스닥 확인용 · QQQM·VOO·SCHD: 약 5분 간격 갱신 (장 마감 시 마지막 값 유지).
     차트는 구간 시작을 0%로 맞춰 누가 더 오르고 내렸는지 비교합니다 (1D = 최근 주식 거래일 시작부터 · 상장이 늦은 종목은 상장일부터 표시 · 장이 닫힌 시간엔 주식 선이 멈춤). 마우스 휠/핀치로 확대·축소, 드래그로 과거 이동. 시간은 한국시간 기준입니다.<br>
     본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
   </footer>
@@ -91,6 +91,7 @@ const ASSETS = [
   {k:'VOO',  color:'#a78bfa', w:1.5, src:'yf'},
   {k:'GOLD', color:'#facc15', w:1.5, src:'bn', sym:'PAXGUSDT'},
   {k:'SCHD', color:'#34d399', w:1.5, src:'yf'},
+  {k:'XYZ100', color:'#f472b6', w:1.5, src:'hl', sym:'xyz:XYZ100'},
 ];
 const TF = {
   '1H':  {b:'1m',  lim:60,   sec:60,     span:3600,           key:'1H'},
@@ -104,7 +105,7 @@ const TF = {
 };
 let tf = '1D', curCfg = null, ymode = 'pct';
 const raw = {}, series = {}, hidden = {}, ohlc = {};
-let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0;
+let stockData = null, stockUpdated = 0, ws = null, wsTimer = null, loadId = 0, ws2 = null, wsTimer2 = null;
 
 const $ = id => document.getElementById(id);
 const chart = LightweightCharts.createChart($('chart'), {
@@ -190,7 +191,7 @@ function renderExtras(){
   cand.setData(useC ? o.map(r=>({time:r[0]+KST, open:conv(r[1],b), high:conv(r[2],b), low:conv(r[3],b), close:conv(r[4],b)})) : []);
   applyVis();
   const vwOn = inds.vw100||inds.vw200||inds.vw300;
-  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD만 가능 (주식은 종가만 있어 선으로 표시)' : ((vwOn && !(ov&&ov.length)) ? 'VWMA는 거래량이 있는 BTC·GOLD만 가능' : '');
+  $('cnote').textContent = (ctype==='candle' && !useC) ? '캔들은 BTC·GOLD·XYZ100만 가능 (주식은 종가만 있어 선으로 표시)' : ((vwOn && !(ov&&ov.length)) ? 'VWMA는 거래량이 있는 BTC·GOLD·XYZ100만 가능' : '');
   renderRSI(); redrawSoon();
 }
 
@@ -347,6 +348,17 @@ async function fetchBinance(sym, cfg){
   const om = new Map(); rows.forEach(r=>om.set(r[0],r));
   return {c: dedupe(rows.map(r=>[r[0],r[4]])), o: [...om.values()].sort((a,b)=>a[0]-b[0])};
 }
+const HL_IV = {'1m':'1m','5m':'5m','30m':'30m','1h':'1h','1d':'1d','1w':'1w'};
+async function fetchHL(sym, cfg){
+  const now = Date.now(), start = now - (cfg.lim+2)*cfg.sec*1000;
+  const r = await fetch('https://api.hyperliquid.xyz/info', {method:'POST', headers:{'content-type':'application/json'},
+    body: JSON.stringify({type:'candleSnapshot', req:{coin:sym, interval:HL_IV[cfg.b], startTime:start, endTime:now}})});
+  if(!r.ok) throw new Error('hl '+r.status);
+  const j = await r.json();
+  const om = new Map(); j.forEach(x=>{ const t=bucket(Math.floor(x.t/1000),cfg); om.set(t,[t,+x.o,+x.h,+x.l,+x.c,+x.v]); });
+  const o = [...om.values()].sort((a,b)=>a[0]-b[0]);
+  return {c: o.map(r=>[r[0],r[4]]), o};
+}
 async function fetchStocks(){
   try{
     const r = await fetch(DATA_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
@@ -378,6 +390,7 @@ async function load(){
     if(id!==loadId) return;
     const btc = bt.c;
     raw.BTC = btc; raw.GOLD = gd.c; ohlc.BTC = bt.o; ohlc.GOLD = gd.o;
+    try{ const xz = await fetchHL('xyz:XYZ100',cfg); if(id!==loadId) return; raw.XYZ100 = xz.c; ohlc.XYZ100 = xz.o; }catch(e){ raw.XYZ100 = []; ohlc.XYZ100 = []; }
     const st = cfg.dyn ? (btc.length ? btc[0][0] : 0) : Date.now()/1000 - cfg.span;
     ['QQQM','VOO','SCHD'].forEach(k=> raw[k] = stockSeries(k,cfg,st));
     renderAll(); chart.timeScale().fitContent(); setLegend(null); setMsg();
@@ -412,7 +425,7 @@ function renderAll(){ ASSETS.forEach(a=>renderOne(a.k)); renderExtras(); }
 
 // ---------- live (Binance websocket) ----------
 let pending = {}, flushT = null;
-function closeWS(){ clearTimeout(wsTimer); if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
+function closeWS(){ clearTimeout(wsTimer); clearTimeout(wsTimer2); if(ws2){ ws2.onclose=null; try{ws2.close();}catch(e){} ws2=null; } if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
 function openWS(cfg){
   closeWS();
   const url = `wss://stream.binance.com:9443/stream?streams=btcusdt@kline_${cfg.b}/paxgusdt@kline_${cfg.b}`;
@@ -429,6 +442,23 @@ function openWS(cfg){
     if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
   };
   ws.onclose = ()=>{ if(myId===loadId) wsTimer = setTimeout(()=>openWS(cfg), 3000); };
+  // XYZ100 (Hyperliquid) 실시간
+  try{
+    ws2 = new WebSocket('wss://api.hyperliquid.xyz/ws');
+    ws2.onopen = ()=>{ ws2.send(JSON.stringify({method:'subscribe', subscription:{type:'candle', coin:'xyz:XYZ100', interval:HL_IV[cfg.b]}})); };
+    ws2.onmessage = ev=>{
+      let m; try{ m=JSON.parse(ev.data); }catch(e){ return; }
+      if(m.channel!=='candle'||!m.data) return;
+      const c=m.data, arr=raw.XYZ100; if(!arr||!arr.length) return;
+      const t=bucket(Math.floor(c.t/1000),cfg), v=+c.c, last=arr[arr.length-1];
+      if(t===last[0]) last[1]=v; else if(t>last[0]) arr.push([t,v]); else return;
+      const oa=ohlc.XYZ100;
+      if(oa&&oa.length){ const lo=oa[oa.length-1]; if(t===lo[0]){ lo[2]=+c.h; lo[3]=+c.l; lo[4]=v; lo[5]=+c.v; } else if(t>lo[0]) oa.push([t,+c.o,+c.h,+c.l,v,+c.v]); }
+      pending.XYZ100=true;
+      if(!flushT) flushT = setTimeout(()=>{ flushT=null; Object.keys(pending).forEach(renderOne); pending={}; renderExtras(); if(!crossOn) setLegend(null); }, 700);
+    };
+    ws2.onclose = ()=>{ if(myId===loadId) wsTimer2 = setTimeout(()=>openWS(cfg), 3000); };
+  }catch(e){}
 }
 
 // ---------- legend / tooltip ----------
