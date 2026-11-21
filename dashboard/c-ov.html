@@ -45,13 +45,13 @@
   #rsibox{display:none;margin-top:6px}
   #rsi{height:130px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
   body.rsi #chart{height:calc(100vh - 430px);min-height:260px}
-  /* Dashboard 안에 넣는 차트: 머리글·꼬리말 제거, 칸 높이에 맞춤 */
-  .wrap{max-width:none;padding:6px 8px 4px}
-  .top a,.top span,.top h1{display:none}
-  #chart{height:calc(100vh - 190px)!important;min-height:120px}
-  body.rsi #chart{height:calc(100vh - 330px)!important}
-  footer{display:none}
-  .tools,.legend{margin-bottom:4px}
+  /* Dashboard: 차트만 */
+  html,body{height:100%;overflow:hidden}
+  .wrap{max-width:none;padding:4px 6px 0}
+  .top,.tools,#msg,footer,#rsibox,#tip,#draw{display:none!important}
+  .legend{margin-bottom:4px;gap:5px}
+  .chip{padding:2px 7px;font-size:11px}
+  #chart{height:calc(100vh - 40px)!important;min-height:0;border:0;border-radius:0}
 </style>
 </head>
 <body>
@@ -63,9 +63,9 @@
     <div class="grp" id="ymode"><button data-m="price">가격</button><button data-m="pct" class="on">%</button></div>
     <div class="sp"></div>
     <div class="grp">
-      <button id="zout" title="줌아웃">−</button>
-      <button id="zin" title="줌인">+</button>
-      <button id="fit" title="전체 보기">전체</button>
+      <button id="zout">−</button>
+      <button id="zin">+</button>
+      <button id="fit">전체</button>
     </div>
   </div>
   <div class="legend" id="legend"></div>

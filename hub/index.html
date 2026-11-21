@@ -203,7 +203,6 @@ function renderTabs() {
   document.getElementById('tabs').innerHTML =
     '<button class="tab' + (CUR === 'sim' ? ' on' : '') + '" onclick="showSim()">Sim</button>' +
     tv +
-    '<button class="tab' + (CUR === 'news' ? ' on' : '') + '" onclick="showNews()">News</button>' +
     '<button class="tab' + (CUR === 'mon' ? ' on' : '') + '" onclick="showMonitor()">Monitor</button>';
 }
 
@@ -310,7 +309,29 @@ function renderSheet(s) {
   mountSound();
   mountCalendar();
   mountKimpChart(s);
-  if (s.label === 'Trading View') mountKimpBelow();
+  if (s.label === 'Trading View') { mountKimpBelow(); tidyTV(); }
+}
+// Trading View 탭 정리: 12종목 시세표·News 숨김(Calendar는 그대로), 1차매수 표를 YTD 표 옆으로
+function tidyTV() {
+  const table = document.querySelector('#view .wrap:not(.kimp-w) > table');
+  if (!table || !table.tBodies[0]) return;
+  const rows = [...table.tBodies[0].rows], tx = r => [...r.cells].map(c => c.textContent.trim());
+  const hideBlock = i => { for (let k = i; k < rows.length; k++) { if (k > i && rows[k].textContent.trim() === '') break; rows[k].style.display = 'none'; } };
+  let i = rows.findIndex(r => { const t = tx(r); return t[0] === '종목' && t[1] === '현재가격'; });
+  if (i >= 0) hideBlock(i);
+  i = rows.findIndex(r => tx(r)[0] === 'News');
+  if (i >= 0) hideBlock(i);
+  const y0 = rows.findIndex(r => { const t = tx(r); return t[0] === '종목' && t[1] === 'BTC'; });
+  const b0 = rows.findIndex(r => { const t = tx(r); return t[0] === '종목' && t[1] !== 'BTC' && /^BTC/.test(t[1]); });
+  if (y0 < 0 || b0 < 0 || b0 < y0) return;
+  const pick = (from, endRe) => { const out = []; for (let k = from; k < rows.length; k++) { if (rows[k].textContent.trim() === '') { if (out.length) { rows[k].style.display = 'none'; } continue; } out.push(rows[k]); if (endRe.test(tx(rows[k])[0])) break; } return out; };
+  const A = pick(y0, /^배당/), B = pick(b0, /^3차 매수[\s\S]*발생일자/);
+  const cols = [...table.querySelectorAll('colgroup col')].slice(0, 7).map(c => c.outerHTML).join('');
+  const mk = trs => { const d = document.createElement('div'); d.className = 'wrap'; d.style.cssText = 'flex:none;max-width:100%'; d.innerHTML = '<table><colgroup>' + cols + '</colgroup><tbody></tbody></table>'; trs.forEach(r => { d.querySelector('tbody').appendChild(r); [...r.querySelectorAll('td.first')].forEach(c => { c.style.position = 'static'; }); }); return d; };
+  const host = document.createElement('tr'), span = Math.max(1, table.querySelectorAll('colgroup col').length);
+  host.innerHTML = '<td class="lone" colspan="' + span + '" style="padding:8px 8px 12px"><div class="pairbox" style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"></div></td>';
+  rows[y0].parentNode.insertBefore(host, rows[y0]);
+  const box = host.querySelector('.pairbox'); box.appendChild(mk(A)); box.appendChild(mk(B));
 }
 
 // ===== 큰 체결 소리 (BTC 무기한선물 100만 달러 이상 체결 시 종소리) =====
@@ -473,8 +494,21 @@ function mountSound() {
   box.className = 'snd-box';
   box.innerHTML = '<button id="sndBtn" type="button" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span>';
   cell.appendChild(box);
-  sndLabel();
+  const xz = document.createElement('span'); xz.id = 'xyzBox'; xz.style.cssText = 'margin-left:14px;font-size:14px;font-weight:700;vertical-align:middle;font-variant-numeric:tabular-nums';
+  cell.appendChild(xz);
+  sndLabel(); xyzLoad();
 }
+// XYZ100 (Hyperliquid XYZ100USDC.P): 소수점 없음 + 전일 대비 ±% (상승 빨강/하락 파랑)
+function xyzLoad() {
+  fetch('https://api.hyperliquid.xyz/info', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs', dex: 'xyz' }) })
+    .then(r => r.json()).then(d => {
+      const i = d[0].universe.findIndex(u => u.name === 'xyz:XYZ100'); if (i < 0) return;
+      const c = d[1][i], p = +c.markPx, pv = +c.prevDayPx; if (!(p > 0) || !(pv > 0)) return;
+      const pc = (p / pv - 1) * 100, up = pc >= 0, el = document.getElementById('xyzBox'); if (!el) return;
+      el.innerHTML = '<span style="color:' + (up ? '#FF4D4F' : '#3B82F6') + '">' + Math.floor(p).toLocaleString('en-US') + ' ' + (up ? '+' : '-') + Math.abs(pc).toFixed(2) + '%</span>';
+    }).catch(() => {});
+}
+setInterval(xyzLoad, 10000);
 // 예전에 켜 두었으면: 브라우저는 화면을 한 번 눌러야 소리를 허용하므로 첫 터치 때 다시 켬
 if (SND.on) {
   sndConnect();
@@ -716,7 +750,7 @@ function mountKimpBelow() {   // Kimp 탭 삭제 → 환율 표 + 테더 김프 
   });
   t += '</tbody></table>';
   KIMP_ON = false;
-  view.insertAdjacentHTML('beforeend', '<div class="wrap kimp-w" id="kimpBelow" style="margin-top:12px">' + t +
+  view.insertAdjacentHTML('afterbegin', '<div class="wrap kimp-w" id="kimpBelow" style="margin-bottom:12px">' + t +
     '<div style="font-size:14px;font-weight:700;margin:16px 2px 6px">Kimp 테더 김프 일평균 · 1년</div>' +
     '<div class="kh-box" id="khBox"></div></div>');
   khRefresh();

@@ -38,13 +38,12 @@
   #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
   #draw.act{pointer-events:auto;cursor:crosshair}
 #tv-attr-logo{display:none!important}
-  /* Dashboard 안에 넣는 차트: 머리글·꼬리말 제거, 칸 높이에 맞춤 */
-  .wrap{max-width:none;padding:6px 8px 4px}
-  .top a,.top span,.top h1,#legend .chip,#legend .dot{display:none}
-  #legend{margin-bottom:4px}
-  #chart{height:calc(100vh - 150px);min-height:120px}
-  footer{display:none}
-  .tools{margin-bottom:4px}
+  /* Dashboard: 차트만 */
+  html,body{height:100%;overflow:hidden}
+  .wrap{max-width:none;padding:0;height:100%}
+  .top,.legend,.tools,#msg,footer,#tip,#draw{display:none!important}
+  #chartbox{height:100%}
+  #chart{height:100vh!important;min-height:0;border:0;border-radius:0}
 </style>
 </head>
 <body>
@@ -56,10 +55,10 @@
     <div class="grp" id="ymode"><button data-m="price" class="on">가격</button><button data-m="pct">%</button></div>
     <div class="sp"></div>
     <div class="grp">
-      <button id="zout" title="줌아웃">−</button>
-      <button id="zin" title="줌인">+</button>
-      <button id="rst" title="초기화 (더블클릭도 동일)">초기화</button>
-      <button id="fit" title="전체 보기">전체</button>
+      <button id="zout">−</button>
+      <button id="zin">+</button>
+      <button id="rst">초기화</button>
+      <button id="fit">전체</button>
     </div>
   </div>
   <div class="legend" id="legend"></div>
@@ -72,7 +71,7 @@
   </div>
   <div class="tools">
     <span class="lbl">그리기</span>
-    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
+    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
     <span class="lbl" id="cnote"></span>
   </div>
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
@@ -100,18 +99,19 @@ const ASSETS = [
   {k:'XYZ100', color:'#f472b6', src:'hl', sym:'xyz:XYZ100'},
 ];
 const TF = {
+  '5M': {b:'5m', sec:300,   intraday:true, pages:2, skey:'1h'},
   '1H': {b:'1h', sec:3600,   intraday:true, pages:2, skey:'1h'},
   '4H': {b:'4h', sec:14400,  intraday:true, pages:2, skey:'1h', agg:4},
   '1D': {b:'1d', sec:86400,  pages:2, skey:'1d'},
   '1W': {b:'1w', sec:604800, pages:1, skey:'1w'},
 };
 const OPTS = [
-  ['internal','내부구조',true],['swing','스윙구조',true],['iob','내부OB',true],['sob','스윙OB',false],
-  ['eq','EQH/EQL',true],['hl','강/약 고저',true],['fvg','FVG',false],['pd','프리미엄/디스카운트',false],
+  ['internal','내부구조',false],['swing','스윙구조',false],['iob','내부OB',false],['sob','스윙OB',false],
+  ['eq','EQH/EQL',false],['hl','강/약 고저',false],['fvg','FVG',false],['pd','프리미엄/디스카운트',false],
   ['pts','스윙포인트',false],['trend','캔들색',false],['mD','일 고저',false],['mW','주 고저',false],['mM','월 고저',false],
 ];
 const GREEN='#089981', RED='#F23645', GRAY='#878b94', BLUE='#2157f3';
-let sym=(new URLSearchParams(location.search).get('s')||'BTC').toUpperCase(), tf='1W', ymode='price', mode='hist', swingLen=50;
+let sym=(new URLSearchParams(location.search).get('s')||'BTC').toUpperCase(), tf='5M', ymode='pct', mode='hist', swingLen=50;
 const on = {}; OPTS.forEach(o=>on[o[0]]=o[2]);
 let bars=[], cfg=TF[tf], smc=null, base=1, dT=[], tIdx=new Map();
 let stockData=null, stockUpdated=0, ws=null, wsTimer=null, loadId=0, zeroLine=null, recT=null, rdT=null;
@@ -155,7 +155,7 @@ async function fetchBinance(symb, c){
   }
   return rows;
 }
-const HL_IV={'1h':'1h','4h':'4h','1d':'1d','1w':'1w'};
+const HL_IV={'5m':'5m','1h':'1h','4h':'4h','1d':'1d','1w':'1w'};
 async function fetchHL(coin, c){
   const now=Date.now(), n=Math.min(5000, c.pages*1000+1000);
   const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},

@@ -63,8 +63,7 @@
   td a:hover{text-decoration:underline}
   .cat{display:inline-block;font-weight:700;font-size:12px;padding:2px 8px;border-radius:6px;white-space:nowrap}
   .tw{background:var(--card);height:100%;overflow:auto}
-  #nw td.tm{color:#727a87;white-space:nowrap;font-size:12px}
-  #nw td.cc{text-align:center;width:72px}
+  .it.nw{cursor:default}
   /* B-5 속보 */
   #c-flash .cb{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:0;overflow:hidden}
   .pane{overflow:auto;padding:8px 12px;min-height:0}
@@ -99,34 +98,33 @@
 <body>
 <div id="headline"></div>
 <main>
-  <div class="top"><a href="../">#6683</a><span class="sub">/</span><h1 id="ttl">Dashboard</h1><span class="sub" id="stamp"></span></div>
 
   <!-- 상단 1줄 : 3칸 (33.3% x 3) -->
   <section class="row" id="row1">
-    <div class="rh"><span class="rt">상단 · 시세 / 차트 / 뉴스</span><button class="xb" data-x="row" title="이 줄 크게 보기">⤢</button></div>
+    <div class="rh"><span class="rt">상단 · 시세 / 차트 / 뉴스</span><button class="xb" data-x="row">⤢</button></div>
     <div class="cells c3">
       <div class="cell" id="c-mon">
-        <div class="ch"><span>시세 전광판<small id="monAt"></small></span><button class="xb" title="크게 보기">⤢</button></div>
+        <div class="ch"><span>시세 전광판<small id="monAt"></small></span><button class="xb">⤢</button></div>
         <div class="cb"><div class="mon-g" id="monG"></div></div>
       </div>
       <div class="stack">
-        <div class="cell"><div class="ch"><span>BTC · SMC</span><button class="xb" title="크게 보기">⤢</button></div><div class="cb"><iframe title="BTC" src="c-smc.html?s=BTC"></iframe></div></div>
-        <div class="cell"><div class="ch"><span>XYZ100USDC · SMC</span><button class="xb" title="크게 보기">⤢</button></div><div class="cb"><iframe title="XYZ100" src="c-smc.html?s=XYZ100"></iframe></div></div>
-        <div class="cell"><div class="ch"><span>overview</span><button class="xb" title="크게 보기">⤢</button></div><div class="cb"><iframe title="overview" src="c-ov.html"></iframe></div></div>
+        <div class="cell"><div class="ch"><span>BTC · SMC</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-smc.html?s=BTC"></iframe></div></div>
+        <div class="cell"><div class="ch"><span>XYZ100USDC · SMC</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-smc.html?s=XYZ100"></iframe></div></div>
+        <div class="cell"><div class="ch"><span>overview</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-ov.html"></iframe></div></div>
       </div>
       <div class="cell" id="c-news">
-        <div class="ch"><span>News<small>미증시 4 · 한국증시 2 · 코인 2</small></span><button class="xb" title="크게 보기">⤢</button></div>
-        <div class="cb tw"><table id="nw"><thead><tr><th>분류</th><th>시각</th><th>제목</th></tr></thead><tbody></tbody></table></div>
+        <div class="ch"><span>News<small>미증시 4 · 한국증시 2 · 코인 2</small></span><button class="xb">⤢</button></div>
+        <div class="cb"><div class="pane" id="nw" style="height:100%"></div></div>
       </div>
     </div>
   </section>
 
   <!-- 중단 1줄 : 100% -->
   <section class="row auto" id="row2">
-    <div class="rh"><span class="rt">중단 · 시세표</span><button class="xb" data-x="row" title="이 줄 크게 보기">⤢</button></div>
+    <div class="rh"><span class="rt">중단 · 시세표</span><button class="xb" data-x="row">⤢</button></div>
     <div class="cells c1">
       <div class="cell" id="c-tbl">
-        <div class="ch"><span>Trading View<small id="tblAt"></small></span><button class="xb" title="크게 보기">⤢</button></div>
+        <div class="ch"><span>Trading View<small id="tblAt"></small></span><button class="xb">⤢</button></div>
         <div class="cb tw"><table id="tv"></table></div>
       </div>
     </div>
@@ -134,10 +132,10 @@
 
   <!-- 하단 1줄 : 100% -->
   <section class="row" id="row3">
-    <div class="rh"><span class="rt">하단 · 핫이슈 / 속보</span><button class="xb" data-x="row" title="이 줄 크게 보기">⤢</button></div>
+    <div class="rh"><span class="rt">하단 · 핫이슈 / 속보</span><button class="xb" data-x="row">⤢</button></div>
     <div class="cells c1">
       <div class="cell" id="c-flash">
-        <div class="ch"><span>코인니스 속보<small id="flAt"></small></span><button class="xb" title="크게 보기">⤢</button></div>
+        <div class="ch"><span>코인니스 속보<small id="flAt"></small></span><button class="xb">⤢</button></div>
         <div class="cb">
           <div class="pane"><h2>🔥 핫 이슈 5</h2><div id="hot"><div class="msg">불러오는 중…</div></div></div>
           <div class="pane"><h3>⚡ 속보 20 <small style="color:var(--sub);font-weight:400">(눌러서 요약 펼치기)</small></h3><div id="fl"><div class="msg">불러오는 중…</div></div></div>
@@ -151,7 +149,7 @@
 <script>
 (function(){
 const TAB = 'Dashboard';                          // 탭 이름 → 제목·캡션 자동
-document.title = TAB + ' · #6683'; document.getElementById('ttl').textContent = TAB;
+document.title = TAB + ' · #6683';
 const $ = id => document.getElementById(id);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const p2 = n => (n<10?'0':'')+n;
@@ -159,7 +157,7 @@ const KST = ms => new Date(ms + 9*3600000);
 const DASH_URL = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/dash/dash.json';
 
 /* ---------- 크게 보기 / 원상태 ---------- */
-function setIcon(btn, on){ btn.textContent = on ? '⤡' : '⤢'; btn.title = on ? '원래 크기로' : '크게 보기'; }
+function setIcon(btn, on){ btn.textContent = on ? '⤡' : '⤢';  }
 function closeAll(){
   document.querySelectorAll('.max').forEach(e=>{ e.classList.remove('max'); const b=e.querySelector(':scope > .ch > .xb, :scope > .rh > .xb'); if(b) setIcon(b,false); });
   document.body.classList.remove('lock');
@@ -217,14 +215,16 @@ const CATC = {'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c
 const NEWS_N = {'미증시':4,'한국증시':2,'코인':2};
 let NEWS = null, LOWS = {}, SHEET = null;
 function drawNews(){
-  const rows = NEWS || [];
-  const tb = document.querySelector('#nw tbody');
-  if(!rows.length){ tb.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#727a87">뉴스를 불러오는 중…</td></tr>'; return; }
-  tb.innerHTML = rows.map(n=>{
-    const c = CATC[n.cat]||['#eee','#444'], d = KST(n.at*1000);
-    const tm = p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate())+' '+p2(d.getUTCHours())+':'+p2(d.getUTCMinutes());
-    return '<tr><td class="cc"><span class="cat" style="background:'+c[0]+';color:'+c[1]+'">'+esc(n.cat)+'</span></td><td class="tm">'+tm+'</td>'+
-      '<td><a href="'+esc(n.l)+'" target="_blank" rel="noopener">'+esc(n.t)+'</a>'+(n.src?' <span style="color:#9aa1ad;font-size:11px">· '+esc(n.src)+'</span>':'')+'</td></tr>';
+  const rows = NEWS || [], box = $('nw');
+  if(!rows.length){ box.innerHTML = '<div class="msg">뉴스를 불러오는 중…</div>'; return; }
+  let last = '';
+  box.innerHTML = rows.map(n=>{
+    const c = CATC[n.cat]||['#262a31','#cfd3dc'], d = KST(n.at*1000);
+    const day = p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate()), tm = p2(d.getUTCHours())+':'+p2(d.getUTCMinutes());
+    let h = ''; if(day!==last){ h += '<div style="font-size:12px;color:var(--sub);font-weight:700;padding:6px 0 2px">'+day+'</div>'; last = day; }
+    return h + '<div class="it nw"><div class="row2"><span class="tm">'+tm+'</span><span class="chip" style="background:'+c[0]+';color:'+c[1]+'">'+esc(n.cat)+'</span>'+
+      '<a class="ttl" style="color:var(--tx);text-decoration:none" href="'+esc(n.l)+'" target="_blank" rel="noopener">'+esc(n.t)+'</a></div>'+
+      (n.src?'<div style="margin:2px 0 0 46px;font-size:11px;color:var(--sub)">'+esc(n.src)+'</div>':'')+'</div>';
   }).join('');
 }
 function newsFromSheet(){            // dash.json 이 없을 때: 시트의 뉴스 줄에서 분류별 개수만큼
