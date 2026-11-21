@@ -37,6 +37,7 @@
   select{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:13px}
   #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
   #draw.act{pointer-events:auto;cursor:crosshair}
+#tv-attr-logo{display:none!important}
 </style>
 </head>
 <body>
@@ -116,7 +117,7 @@ const axisFmt = v=> ymode==='pct' ? sgn(v) : fmtV(v);
 
 // ---------- chart ----------
 const chart = LightweightCharts.createChart($('chart'), {
-  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7'},
+  layout:{background:{color:'#0f1115'}, textColor:'#8b93a7', attributionLogo:false},
   grid:{vertLines:{color:'#1b1f27'}, horzLines:{color:'#1b1f27'}},
   rightPriceScale:{borderColor:'#2a2f3a', minimumWidth:80},
   timeScale:{borderColor:'#2a2f3a', timeVisible:true, secondsVisible:false, rightOffset:24},
