@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<script src="shim.js"></script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg:#f6f7fa; --panel:#fff; --ink:#212633; --ink2:#4a5160; --ink3:#7f8793; --line:#e4e7ee; --hot:#e5484d; --up:#d6334a; --down:#2563eb; --chip:#eef1f7; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.55 -apple-system,'Apple SD Gothic Neo','Malgun Gothic',sans-serif; }
+  main { max-width:880px; margin:0 auto; padding:12px; }
+  h1 { font-size:17px; margin:2px 0 0; }
+  .sub { color:var(--ink3); font-size:12px; margin:2px 0 10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:6px 14px; margin-bottom:12px; }
+  .card h2 { font-size:13px; margin:8px 0 2px; color:var(--ink2); }
+  .hot { background:linear-gradient(180deg,#fff4f2 0%,#ffffff 70%); border:2px solid #f3b6ae; border-left:6px solid var(--hot); box-shadow:0 2px 10px rgba(229,72,77,.15); padding:10px 14px 8px; }
+  .hot h2 { font-size:16px; font-weight:800; color:var(--hot); margin:0 0 6px; letter-spacing:-.2px; }
+  .issue { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid #f5d9d5; }
+  .issue:last-child { border-bottom:0; }
+  .issue .n { flex:none; width:24px; height:24px; line-height:24px; text-align:center; border-radius:50%; background:var(--hot); color:#fff; font-size:13px; font-weight:800; }
+  .issue:nth-child(n+5) .n { background:#f08a8d; }
+  .issue a { color:#1a1d26; text-decoration:none; font-size:15px; font-weight:700; line-height:1.45; }
+  .issue a:hover { color:var(--hot); }
+  .day { font-size:12px; color:var(--ink3); font-weight:700; padding:10px 0 2px; }
+  .it { padding:8px 0; border-bottom:1px solid var(--line); cursor:pointer; }
+  .it:last-child { border-bottom:0; }
+  .row { display:flex; gap:8px; align-items:baseline; }
+  .tm { color:var(--ink3); font-size:12px; min-width:38px; font-variant-numeric:tabular-nums; }
+  .chip { background:var(--chip); color:var(--ink2); font-size:10px; font-weight:700; padding:1px 6px; border-radius:5px; white-space:nowrap; }
+  .ttl { flex:1; font-weight:600; }
+  .imp .ttl { color:var(--hot); }
+  .body { display:none; margin:6px 0 2px 46px; color:var(--ink2); font-size:13px; }
+  .it.open .body { display:block; }
+  .meta { margin-top:6px; font-size:12px; color:var(--ink3); }
+  .meta .b { color:var(--up); } .meta .s { color:var(--down); }
+  .meta a { color:#2f5bd8; text-decoration:none; margin-left:8px; }
+  .msg { padding:40px; text-align:center; color:var(--ink3); }
+  .foot { color:var(--ink3); font-size:11px; text-align:center; padding:4px 0 14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>📰 코인니스 속보 요약</h1>
+  <div class="sub" id="sub">불러오는 중…</div>
+  <div id="app"><div class="msg">불러오는 중…</div></div>
+  <div class="foot">출처: 코인니스 · 매시 정각 자동 갱신 · 참고용이며 투자 권유가 아닙니다</div>
+</main>
+<script>
+window.onerror = function (m) { var a = document.getElementById('app'); if (a) a.innerHTML = '<div class="msg">스크립트 오류: ' + String(m) + '</div>'; };
+var REFRESH_MS = 60 * 60 * 1000;
+var DATA = null;
+var $ = function (i) { return document.getElementById(i); };
+function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function p2(n) { return (n < 10 ? '0' : '') + n; }
+function kst(ms) { return new Date(ms + 9 * 3600000); }
+function hhmm(iso) { var d = kst(new Date(iso).getTime()); return p2(d.getUTCHours()) + ':' + p2(d.getUTCMinutes()); }
+function mmdd(iso) { var d = kst(new Date(iso).getTime()); return p2(d.getUTCMonth() + 1) + '-' + p2(d.getUTCDate()); }
+
+function render() {
+  var d = DATA, h = '';
+  if (!d) return;
+  if (d.issues && d.issues.length) {
+    h += '<div class="card hot"><h2>🔥 핫 이슈</h2>';
+    d.issues.forEach(function (x, i) {
+      h += '<div class="issue"><span class="n">' + (i + 1) + '</span><a target="_blank" href="https://coinness.com/news/' + esc(x.id) + '">' + esc(x.t) + '</a></div>';
+    });
+    h += '</div>';
+  }
+  h += '<div class="card"><h2>⚡ 속보 (눌러서 요약 펼치기)</h2>';
+  var lastDay = '';
+  d.list.forEach(function (x) {
+    var day = mmdd(x.at);
+    if (day !== lastDay) { h += '<div class="day">' + day + '</div>'; lastDay = day; }
+    var body = esc(x.c).split('\n').join('<br>');
+    h += '<div class="it' + (x.imp ? ' imp' : '') + '" onclick="this.classList.toggle(\'open\')">' +
+      '<div class="row"><span class="tm">' + hhmm(x.at) + '</span>' +
+      (x.sym ? '<span class="chip">' + esc(x.sym) + '</span>' : '') +
+      '<span class="ttl">' + (x.imp ? '🔴 ' : '') + esc(x.t) + '</span></div>' +
+      '<div class="body">' + body +
+      '<div class="meta"><span class="b">▲ ' + x.bull + '</span> · <span class="s">▼ ' + x.bear + '</span>' +
+      '<a target="_blank" href="https://coinness.com/news/' + esc(x.id) + '" onclick="event.stopPropagation()">원문 ›</a></div></div></div>';
+  });
+  h += '</div>';
+  $('app').innerHTML = h;
+  var t = kst(d.at);
+  $('sub').textContent = '마지막 갱신 ' + p2(t.getUTCMonth() + 1) + '-' + p2(t.getUTCDate()) + ' ' + p2(t.getUTCHours()) + ':' + p2(t.getUTCMinutes()) + ' · 매시 정각 자동 갱신';
+}
+
+function load() {
+  google.script.run
+    .withSuccessHandler(function (d) { try { DATA = d; render(); } catch (e) { $('app').innerHTML = '<div class="msg">표시 오류: ' + esc(e && e.message) + '</div>'; } })
+    .withFailureHandler(function (e) {
+      if (!DATA) { $('app').innerHTML = '<div class="msg">데이터를 불러오지 못했어요 (' + esc((e && e.message) || e) + '). 다음 자동 갱신 때 다시 시도합니다.</div>'; $('sub').textContent = ''; }
+    })
+    .news_getData();
+}
+load();
+// 매시 정각(+5초)에 맞춰 1시간마다 자동 갱신
+function schedule() {
+  setTimeout(function () { load(); schedule(); }, 3600000 - (Date.now() % 3600000) + 5000);
+}
+schedule();
+</script>
+</body>
+</html>

@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<script src="shim.js"></script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simulation</title>
+<style>
+  :root {
+    --bg: #f6f7fa; --panel: #ffffff; --panel2: #eef0f4; --line: #e3e6ec;
+    --ink: #212633; --ink2: #4d5565; --ink3: #7f8793;
+    --buy: #E8323C; --buy-bg: rgba(232,50,60,.09);      /* 상승·BUY = 빨강 */
+    --sell: #2F6BDB; --sell-bg: rgba(47,107,219,.09);   /* 하락·SELL = 파랑 */
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Noto Sans KR', -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; font-size: 14px; line-height: 1.45; }
+  .wrap { max-width: 1240px; margin: 0 auto; padding: 12px; }
+  .charts { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 10px; margin-bottom: 12px; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+  .tabs { display: flex; gap: 4px; background: var(--panel2); padding: 3px; border-radius: 9px; }
+  .tabs button { border: 0; background: transparent; color: var(--ink2); font: inherit; font-weight: 600; padding: 5px 12px; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+  .tabs button.on { background: var(--panel); color: var(--ink); box-shadow: 0 0 0 1px var(--line); }
+  .hint { color: var(--ink3); font-size: 12px; }
+  .pane-h { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 8px 0 2px; }
+  .pane-h .name { font-weight: 700; }
+  .pane-h .val { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink2); }
+  .pane-h .val b { font-weight: 700; }
+  canvas { display: block; width: 100%; touch-action: pan-y; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink2); margin-top: 4px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+  .legend i.sq { border-radius: 2px; width: 12px; height: 8px; opacity: .55; vertical-align: 0; }
+  .vid { margin-top: 12px; text-align: center; }
+  .vid .cap { color: var(--ink3); font-size: 12px; margin-bottom: 6px; }
+  .vid .box { position: relative; width: min(100%, 320px); aspect-ratio: 9 / 16; margin: 0 auto; background: #000; border-radius: 10px; overflow: hidden; }
+  .vid iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+  .vb { font: inherit; font-size: 12px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
+  .vid a { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--ink3); }
+  .sum { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 12px; }
+  .sum.c3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sc { min-width: 0; overflow-wrap: anywhere; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 11px 8px; }
+  .sc .n { font-size: clamp(10px, 1vw, 12px); font-weight: 700; display: flex; align-items: center; gap: 6px; }
+  .sc .n i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .sc .f { white-space: nowrap; font-size: clamp(10px, 1.12vw, 17px); font-weight: 800; font-variant-numeric: tabular-nums; margin: 2px 0; display: flex; flex-wrap: nowrap; align-items: baseline; gap: 0 8px; }
+  .sc .d { font-size: clamp(9px, 0.95vw, 11.5px); color: var(--ink3); font-variant-numeric: tabular-nums; line-height: 1.5; }
+  .yt { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px 12px; }
+  .yt h2 { font-size: 14px; margin: 0 0 6px; font-weight: 700; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 5px 8px; text-align: right; border-bottom: 1px solid var(--line); font-size: 13px; }
+  th { color: var(--ink3); font-weight: 600; font-size: 12px; }
+  th:first-child, td:first-child { text-align: left; }
+  td.s { font-weight: 800; }
+  .up { color: var(--buy); } .down { color: var(--sell); }
+  .small { color: var(--ink3); font-size: 11.5px; margin-top: 6px; }
+  .msg { padding: 30px 0; text-align: center; color: var(--ink3); }
+  @media (max-width: 560px) { .sum { gap: 3px; } .sc { padding: 5px 5px 6px; } .sc .n { font-size: 9px; gap: 3px; } .sc .n i { width: 6px; height: 6px; } .sc .f { font-size: 9.5px; gap: 0 4px; flex-wrap: wrap; white-space: normal; } .sc .d { font-size: 7.5px; line-height: 1.35; } .sc .hint { display: none; } .tabs button { padding: 5px 9px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="sum" id="sum"></div>
+  <section class="charts">
+    <div class="top">
+      <div class="tabs" id="kTabs"></div>
+      <div class="tabs" id="mTabs"></div>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div id="panes"></div>
+    <div class="legend" id="legend"></div>
+  </section>
+  <section class="charts" id="subsec"><div id="subs"></div></section>
+  <section class="yt"><h2>연도별 수익률</h2><div style="overflow-x:auto"><table id="yt"></table></div></section>
+  <section class="yt" id="mtsec" style="display:none"><h2 id="mth"></h2><div style="overflow-x:auto"><table id="mt"></table></div><div class="small" id="foot"></div></section>
+  <section class="charts" style="margin:12px 0 0"><div class="vid" id="vid" style="margin-top:0"></div></section>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const KINDS = [['T', 'Tripod'], ['F', 'VIX 공격적 전략']];
+const MODES = [];
+const HINTS = { F: '10년 전부터 시작 $100,000 · 기본 QQQM 보유 → VIX 급등 SELL이면 QQQM 50% + VOO 50%로 절반만 방어 → 안정되면 BUY로 QQQM 100% 복귀 · QQQM 200일선 위 눌림(VIX 급등)이면 ADD로 $200,000 추가 투입', T: '10년 전부터 시작 $100,000 · 나스닥100이 250일선 위(상승)면 VIX 10일평균 28 미만 + 낙폭 9% 이내일 때 TQQQ(3배), 아니면 QQQ(1배) · 250일선 아래(하락)면 VIX 25 미만일 때 QQQ(1배), 아니면 현금 · 신호 종가 확정, 다음 거래일 종가 체결 · 차트 표시는 체결일 기준' };
+let kind = 'T', mode = 'tab', D = null, hov = null, seq = 0;
+const cache = {};
+const VIDS = {};   // 영상은 최종 확정 후 새로 만들어 연결
+function vid() { $('vid').parentNode.style.display = 'none'; }
+function vid_old_() {
+  const id = VIDS[kind], sec = $('vid').parentNode;
+  if (!id) { sec.style.display = 'none'; return; }
+  sec.style.display = '';
+  $('vid').innerHTML = '<div class="cap">' + KINDS.find(k => k[0] === kind)[1] + ' · 10년 요약 영상 (소리 없음)</div><div class="box"><iframe src="https://drive.google.com/file/d/' + id + '/preview" allow="autoplay; fullscreen" allowfullscreen></iframe></div><a href="https://drive.google.com/file/d/' + id + '/view" target="_blank" rel="noopener">새 창에서 열기</a>';
+}
+
+
+
+/* ===== 요약 영상 3종 (페이지 안 canvas 직접 재생 · 파일 업로드 없음 · 데이터가 바뀌면 자동 최신 · 제목·캡션은 탭 이름 자동) ===== */
+const VID_SEC = 16, VFONT = '"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif', VTM = [];
+const VC = { bg: '#0f1420', panel: '#171e2e', ink: '#fff', dim: '#8b95a8', buy: '#ff5a64', sell: '#4c8dff', add: '#22c55e', q: '#ff9f43', inv: '#5b8cff' };
+function vtx(g, t, x, y, sz, c, al, w) { g.font = (w || '700') + ' ' + sz + 'px ' + VFONT; g.fillStyle = c; g.textAlign = al || 'left'; g.textBaseline = 'alphabetic'; g.fillText(t, x, y); }
+function vrr(g, x, y, w, h, r, f) { g.beginPath(); g.roundRect(x, y, w, h, r); g.fillStyle = f; g.fill(); }
+function vmoney(v) { return '$' + Math.round(v).toLocaleString('en-US'); }
+function vblock(host, cap, fname, draw) {
+  const d = document.createElement('div'); d.style.cssText = 'flex:1 1 0;min-width:0;max-width:340px;font-size:11px';
+  d.innerHTML = '<div class="cap" style="font-size:10.5px;line-height:1.25;min-height:27px">' + cap + '</div><div class="box"><canvas width="720" height="1280" style="position:absolute;inset:0;width:100%;height:100%"></canvas></div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;justify-content:center"><button class="vb" style="padding:4px 6px;font-size:11px" data-a="p">▶️ 재생</button><button class="vb" style="padding:4px 6px;font-size:11px" data-a="s">⬇️ 영상 파일 저장(.webm)</button><span class="cap" style="flex-basis:100%;font-size:10px" data-a="m"></span></div>';
+  host.appendChild(d);
+  const cv = d.querySelector('canvas'), g = cv.getContext('2d'), msg = d.querySelector('[data-a=m]'); let iv = null;
+  function play(done) {
+    if (iv) clearInterval(iv); const t0 = Date.now(), ms = VID_SEC * 1000;
+    iv = setInterval(() => { const p = (Date.now() - t0) / ms; if (p >= 1.06) { clearInterval(iv); iv = null; draw(g, 1); if (done) done(); return; } draw(g, Math.min(1, p)); }, 33); VTM.push(iv);
+  }
+  d.querySelector('[data-a=p]').onclick = () => play();
+  d.querySelector('[data-a=s]').onclick = () => {
+    try {
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm', rec = new MediaRecorder(cv.captureStream(30), { mimeType: mime, videoBitsPerSecond: 1800000 }), parts = [];
+      rec.ondataavailable = e => { if (e.data.size) parts.push(e.data); };
+      rec.onstop = () => { const url = URL.createObjectURL(new Blob(parts, { type: 'video/webm' })), a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove(); msg.textContent = '저장됨 (다운로드 폴더 확인)'; };
+      msg.textContent = '녹화 중… ' + VID_SEC + '초'; rec.start(500); play(() => setTimeout(() => rec.stop(), 300));
+    } catch (e) { msg.textContent = '이 브라우저는 저장을 지원하지 않습니다'; }
+  };
+  draw(g, 0); play();
+}
+function vidMainDraw(nm, dn) {
+  const W = 720, H = 1280, L = D.panes[0].lines, EQ = L[0].v, n = EQ.length, T = D.T, M = D.marks, isT = kind === 'T';
+  const BQ = isT ? D.bq : L[1].v, INV = isT ? EQ.map(() => D.sum[0].inv) : L[2].v;
+  if (!BQ || !INV) return null;
+  const NMc = { Q: 'QQQ', L: 'QLD', T: 'TQQQ', C: '현금' }, SC = { T: VC.buy, L: VC.q, Q: VC.add, C: VC.sell };
+  const tst = k => { let s = M.length ? M[0].f : 'Q'; M.forEach(x => { if (x.k <= k) s = x.t; }); return s; };
+  const def = [];
+  if (isT) { let s = (M.length && M[0].f === 'C') ? 0 : null; M.forEach(x => { if (x.t === 'C') s = x.k; else if (s != null) { def.push([s, x.k]); s = null; } }); if (s != null) def.push([s, n - 1]); }
+  else { let s = null; M.forEach(x => { if (x.s === 'SELL') s = x.k; else if (x.s === 'BUY' && s != null) { def.push([s, x.k]); s = null; } }); if (s != null) def.push([s, n - 1]); }
+  const SUB = isT ? '10년 · 시작 $100,000 · 250일선 + VIX 조건' : '10년 · 시작 $100,000 · 눌림 시 추가 투입';
+  const ds = k => dstr(T[k]);
+  let mn = 1e18, mx = 0; [EQ, BQ, INV].forEach(a => a.forEach(v => { if (v > 0) { mn = Math.min(mn, v); mx = Math.max(mx, v); } }));
+  const a0 = Math.log(mn * .9), b0 = Math.log(mx * 1.08), x0 = 36, y0 = 300, cw = 648, ch = 640;
+  const X = i => x0 + i / (n - 1) * cw, Y = v => y0 + ch - (Math.log(v) - a0) / (b0 - a0) * ch;
+  const s0 = D.sum[0], s1 = D.sum[1], dc = s0.cagr - s1.cagr, dm = Math.abs(s0.mdd) - Math.abs(s1.mdd);
+  const concl = (Math.abs(dc) < 1 ? '수익은 비슷' : dc > 0 ? '수익은 더 높음' : '수익은 더 낮음') + ', ' + (Math.abs(dm) < 1 ? '낙폭은 비슷' : dm < 0 ? '낙폭은 줄임' : '낙폭은 더 큼');
+  return function (g, p) {
+    const q = Math.min(1, p / .9), m = Math.min(n - 1, Math.floor(q * (n - 1)));
+    g.fillStyle = VC.bg; g.fillRect(0, 0, W, H);
+    vtx(g, nm, 36, 96, 44, VC.ink, 'left', '800'); vtx(g, SUB, 36, 144, 24, VC.dim, 'left', '500');
+    const inDef = def.some(d => m >= d[0] && m <= d[1]), st = isT ? tst(m) : (inDef ? 'C' : 'Q');
+    vrr(g, 36, 190, 648, 70, 16, VC.panel); g.beginPath(); g.arc(70, 225, 11, 0, 7); g.fillStyle = isT ? SC[st] : (inDef ? VC.sell : VC.buy); g.fill();
+    vtx(g, isT ? '보유: ' + NMc[st] : (inDef ? '방어: QQQM 50% + VOO 50%' : '보유: QQQM'), 92, 234, 25, VC.ink, 'left', '700'); vtx(g, ds(m), 668, 234, 23, VC.dim, 'right', '600');
+    def.forEach(d => { if (d[0] > m) return; g.fillStyle = 'rgba(76,141,255,.16)'; g.fillRect(X(d[0]), y0, Math.max(1, X(Math.min(d[1], m)) - X(d[0])), ch); });
+    g.strokeStyle = 'rgba(255,255,255,.08)'; g.lineWidth = 1;
+    [1e5, 2e5, 5e5, 1e6, 2e6, 4e6].forEach(t => { const y = Y(t); if (y < y0 || y > y0 + ch) return; g.beginPath(); g.moveTo(x0, y); g.lineTo(x0 + cw, y); g.stroke(); vtx(g, t >= 1e6 ? '$' + t / 1e6 + 'M' : '$' + t / 1e3 + 'K', x0 + cw - 4, y - 6, 20, VC.dim, 'right', '500'); });
+    for (let yr = 2017; yr <= 2030; yr++) { const k = T.findIndex(t => new Date(t * 86400000).getUTCFullYear() === yr); if (k >= 0) vtx(g, String(yr), X(k), y0 + ch + 30, 20, VC.dim, 'center', '500'); }
+    [[EQ, '#fff', 4, []], [BQ, VC.q, 3, []], [INV, VC.inv, 2, [8, 6]]].forEach(s => { g.beginPath(); g.strokeStyle = s[1]; g.lineWidth = s[2]; g.setLineDash(s[3]); for (let i = 0; i <= m; i++) { const x = X(i), y = Y(s[0][i]); i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); g.setLineDash([]); });
+    const placed = [];
+    M.forEach(mm => {
+      if (mm.k > m) return; const x = X(mm.k), y = Y(EQ[mm.k]), c = mm.s === 'BUY' ? VC.buy : mm.s === 'SELL' ? VC.sell : VC.add, lab = isT ? NMc[mm.t] : mm.s;
+      g.beginPath(); g.arc(x, y, 7, 0, 7); g.fillStyle = c; g.fill(); g.strokeStyle = VC.bg; g.lineWidth = 2; g.stroke();
+      g.font = '800 17px ' + VFONT; const tw = g.measureText(lab).width + 18, up = mm.s === 'SELL'; let ly = up ? y - 34 : y + 34;
+      if (isT && placed.some(o => Math.abs(o.x - x) < Math.max(62, tw) && Math.abs(o.y - ly) < 26)) return;
+      for (let t = 0; t < 6 && placed.some(o => Math.abs(o.x - x) < Math.max(62, tw) && Math.abs(o.y - ly) < 26); t++) ly += up ? -28 : 28; placed.push({ x: x, y: ly });
+      g.strokeStyle = c; g.lineWidth = 1.5; g.beginPath(); g.moveTo(x, y + (up ? -7 : 7)); g.lineTo(x, ly + (up ? 12 : -12)); g.stroke();
+      const lx = Math.max(x0 + tw / 2, Math.min(x0 + cw - tw / 2, x)); vrr(g, lx - tw / 2, ly - 13, tw, 26, 8, c); vtx(g, lab, lx, ly + 7, 17, '#fff', 'center', '800');
+    });
+    let lx = 36; [['전략', '#fff'], [dn + ' 동일 투입', VC.q], ['누적 투입금', VC.inv]].forEach(it => { g.fillStyle = it[1]; g.fillRect(lx, 996, 26, 6); vtx(g, it[0], lx + 34, 1010, 22, VC.dim, 'left', '500'); lx += 34 + g.measureText(it[0]).width + 26; });
+    vrr(g, 36, 1040, 648, 190, 18, p > .92 ? '#1f2a44' : VC.panel);
+    if (p > .92) { vtx(g, '연 ' + pc(s0.cagr) + ' · 최대낙폭 ' + s0.mdd.toFixed(1) + '%', 360, 1105, 36, VC.ink, 'center', '800'); vtx(g, dn + ' 동일 투입: 연 ' + pc(s1.cagr) + ' · 낙폭 ' + s1.mdd.toFixed(1) + '%', 360, 1160, 26, VC.q, 'center', '700'); vtx(g, concl, 360, 1204, 26, VC.dim, 'center', '600'); }
+    else { vtx(g, '전략 ' + vmoney(EQ[m]), 64, 1100, 38, VC.ink, 'left', '800'); vtx(g, dn + ' ' + vmoney(BQ[m]), 64, 1150, 30, VC.q, 'left', '700'); vtx(g, '투입 ' + vmoney(INV[m]), 64, 1196, 26, VC.inv, 'left', '600'); }
+  };
+}
+// 막대 영상 공통: rows = [{ lb, v: [전략, 비교], tot }] — 한 줄씩 차례로 자라남
+function vidBarsDraw(nm, dn, sub, rows, fin) {
+  const W = 720, H = 1280, N = rows.length; if (!N) return null;
+  let lo = 0, hi = 0; rows.forEach(r => r.v.forEach(v => { lo = Math.min(lo, v); hi = Math.max(hi, v); }));
+  const sp = (hi - lo) || 1; lo -= sp * .04; hi += sp * .18;
+  const gx = 150, gw = 534, y0 = 290, ch = 660, rh = ch / N, VX = v => gx + (v - lo) / (hi - lo) * gw, zx = VX(0);
+  const step = sp > 200 ? 50 : sp > 80 ? 25 : 10, ticks = []; for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) ticks.push(t);
+  return function (g, p) {
+    const q = Math.min(1, p / .9), f = q * N, cur = Math.min(N - 1, Math.floor(f)), r = rows[cur], fin_ = p > .92;
+    g.fillStyle = VC.bg; g.fillRect(0, 0, W, H);
+    vtx(g, nm, 36, 96, 44, VC.ink, 'left', '800'); vtx(g, sub, 36, 144, 24, VC.dim, 'left', '500');
+    vrr(g, 36, 190, 648, 70, 16, VC.panel); g.beginPath(); g.arc(70, 225, 11, 0, 7); g.fillStyle = r.v[0] >= 0 ? VC.buy : VC.sell; g.fill();
+    vtx(g, r.lb + ' · 전략 ' + pc(r.v[0]) + ' / ' + dn + ' ' + pc(r.v[1]), 92, 234, 24, VC.ink, 'left', '700');
+    g.lineWidth = 1; ticks.forEach(t => { const x = VX(t); g.strokeStyle = t === 0 ? 'rgba(255,255,255,.35)' : 'rgba(255,255,255,.08)'; g.beginPath(); g.moveTo(x, y0); g.lineTo(x, y0 + ch); g.stroke(); vtx(g, t + '%', x, y0 + ch + 28, 19, VC.dim, 'center', '500'); });
+    rows.forEach((rw, i) => {
+      const pr = Math.max(0, Math.min(1, f - i)); if (pr <= 0) return; const e = 1 - Math.pow(1 - pr, 3), cy = y0 + i * rh + rh / 2;
+      if (rw.tot) { g.fillStyle = 'rgba(255,255,255,.06)'; g.fillRect(36, y0 + i * rh + 2, 648, rh - 4); }
+      vtx(g, rw.lb, gx - 12, cy + 8, 22, rw.tot || i === cur ? VC.ink : VC.dim, 'right', rw.tot || i === cur ? '800' : '600');
+      const sh = Math.min(26, rh * .42), bh = Math.min(18, rh * .3), top = cy - (sh + 3 + bh) / 2;
+      [[0, top, sh, rw.v[0] >= 0 ? VC.buy : VC.sell, 20], [1, top + sh + 3, bh, VC.q, 16]].forEach(b => {
+        const v = rw.v[b[0]], xe = zx + (VX(v) - zx) * e; g.fillStyle = b[3]; g.fillRect(Math.min(zx, xe), b[1], Math.max(1, Math.abs(xe - zx)), b[2]);
+        if (pr > .5) { const tx_ = pc(v); g.font = '700 ' + b[4] + 'px ' + VFONT; const tw = g.measureText(tx_).width;
+          if (v >= 0) { if (xe + 8 + tw > 700) vtx(g, tx_, xe - 8, b[1] + b[2] - 4, b[4], '#fff', 'right', '700'); else vtx(g, tx_, xe + 8, b[1] + b[2] - 4, b[4], b[3], 'left', '700'); }
+          else vtx(g, tx_, zx + 8, b[1] + b[2] - 4, b[4], b[3], 'left', '700'); }
+      });
+    });
+    let lx = 36; g.fillStyle = VC.buy; g.fillRect(lx, 990, 12, 12); g.fillStyle = VC.sell; g.fillRect(lx + 14, 990, 12, 12); vtx(g, '전략', lx + 34, 1010, 22, VC.dim, 'left', '500'); lx += 34 + g.measureText('전략').width + 26;
+    g.fillStyle = VC.q; g.fillRect(lx, 990, 26, 12); vtx(g, dn + ' 보유', lx + 34, 1010, 22, VC.dim, 'left', '500');
+    vrr(g, 36, 1040, 648, 190, 18, fin_ ? '#1f2a44' : VC.panel);
+    if (fin_) { vtx(g, fin[0], 360, 1105, 34, VC.ink, 'center', '800'); vtx(g, fin[1], 360, 1160, 25, VC.q, 'center', '700'); vtx(g, fin[2], 360, 1204, 25, VC.dim, 'center', '600'); }
+    else { const part = rows.slice(0, cur + 1).filter(x => !x.tot), hi_ = part.filter(x => x.v[0] - x.v[1] >= .05).length, lo_ = part.filter(x => x.v[0] - x.v[1] <= -.05).length;
+      vtx(g, r.lb + ' 전략 ' + pc(r.v[0]), 64, 1100, 38, VC.ink, 'left', '800'); vtx(g, dn + ' ' + pc(r.v[1]), 64, 1150, 30, VC.q, 'left', '700'); vtx(g, '전략 높음 ' + hi_ + ' · 낮음 ' + lo_, 64, 1196, 26, VC.dim, 'left', '600'); }
+  };
+}
+function vidYearDraw(nm, dn) {
+  const rows = (D.rows || []).map(r => ({ lb: r.y + (r.p === 'start' ? '~' : r.p === 'ytd' ? ' 올해' : ''), v: r.v })); if (!rows.length) return null;
+  const nHi = rows.filter(r => r.v[0] - r.v[1] >= .05).length, nLo = rows.filter(r => r.v[0] - r.v[1] <= -.05).length;
+  const best = rows.reduce((a, b) => b.v[0] > a.v[0] ? b : a), worst = rows.reduce((a, b) => b.v[0] < a.v[0] ? b : a);
+  return vidBarsDraw(nm, dn, '연도별 수익률 · 전략 vs ' + dn + ' 보유', rows, ['전략이 더 높은 해 ' + nHi + ' / ' + rows.length, '최고 ' + best.lb.replace('~', '') + ' ' + pc(best.v[0]) + ' · 최저 ' + worst.lb.replace('~', '') + ' ' + pc(worst.v[0]), dn + '가 더 높은 해 ' + nLo + '번 (투입금 영향 제외)']);
+}
+function vidMonthDraw(nm, dn) {
+  const mo = D.months; if (!mo || !mo.rows || !mo.rows.length) return null;
+  const rows = mo.rows.map(r => ({ lb: r.m + '월' + (r.cur ? '*' : ''), v: r.v })).concat([{ lb: '누적', v: mo.ytd, tot: 1 }]);
+  const part = mo.rows, nHi = part.filter(r => r.v[0] - r.v[1] >= .05).length, nLo = part.filter(r => r.v[0] - r.v[1] <= -.05).length, df = mo.ytd[0] - mo.ytd[1];
+  return vidBarsDraw(nm, dn, mo.y + '년 월별 수익률 · 전략 vs ' + dn + ' 보유', rows, [mo.y + '년 누적 전략 ' + pc(mo.ytd[0]), dn + ' ' + pc(mo.ytd[1]) + ' · 차이 ' + (df >= 0 ? '+' : '') + df.toFixed(1) + '%p', '전략 높은 달 ' + nHi + ' · 낮은 달 ' + nLo + ' (* 진행 중)']);
+}
+function vidStart() {
+  VTM.forEach(clearInterval); VTM.length = 0;
+  const host = $('vid'); host.innerHTML = ''; host.style.cssText = 'display:flex;gap:10px;justify-content:center;align-items:flex-start'; host.parentNode.style.display = '';
+  const nm = KINDS.find(k => k[0] === kind)[1], dn = kind === 'T' ? 'QQQ' : 'QQQM';
+  [[nm + ' · 10년 요약 영상 (소리 없음)', nm + '_10년요약.webm', vidMainDraw],
+   [nm + ' · 연도별 수익률 영상 (소리 없음)', nm + '_연도별수익률.webm', vidYearDraw],
+   [nm + ' · ' + (D.months ? D.months.y : '') + '년 월별 수익률 영상 (소리 없음)', nm + '_월별수익률.webm', vidMonthDraw]].forEach(a => { let dr = null; try { dr = a[2](nm, dn); } catch (e) { dr = null; } if (dr) vblock(host, a[0], a[1], dr); });
+  if (!host.children.length) host.parentNode.style.display = 'none';
+}
+
+function fmtD2(v) { return '$' + Number(v).toFixed(2); }
+function scCard(s) {
+  const p = [];
+  if (s.inv != null) p.push('투입 ' + fmtD(s.inv) + ' · 손익 <span class="' + cls(s.pnl) + '">' + (s.pnl >= 0 ? '+' : '-') + fmtD(Math.abs(s.pnl)) + '</span>');
+  if (s.mdd != null) p.push('최대낙폭 <span class="down">' + s.mdd.toFixed(1) + '%</span>');
+  if (s.trades != null) p.push('전환 ' + s.trades + '회' + (s.adds ? ' · 추가 투입 ' + s.adds + '회' : ''));
+  return '<div class="sc"><div class="n"><i style="background:' + s.c + '"></i>' + s.n + '</div><div class="f"><span>' + fmtD(s.final) + '</span><span class="' + cls(s.tot) + '">' + pc(s.tot) + '</span>' + (s.cagr != null ? '<span class="' + cls(s.cagr) + '">연 ' + pc(s.cagr) + '</span>' : '') + '</div><div class="d">' + p.join(' · ') + '</div></div>';
+}
+function ingCard(ing) {
+  return '<div class="sc"><div class="n"><i style="background:#16a34a"></i>Position</div>' + (ing.length ? ing.map(x => '<div class="f"><span>' + x.t + '</span><span>' + fmtD2(x.p) + '</span></div><div class="d">구매 ' + x.d + ' · 현재 ' + fmtD2(x.cur) + ' <span class="' + cls(x.cur / x.p - 1) + '">' + pc((x.cur / x.p - 1) * 100) + '</span></div>').join('') : '<div class="d">-</div>') + '</div>';
+}
+// 상단 3칸: Position / Tripod 전략 / VIX 공격적 전략 (어느 탭이든 항상 표시)
+function topSum() {
+  const F = cache['F_tab'], T = cache['T_tab'], o = kind === 'F' ? 'T' : 'F';
+  if (!cache[o + '_tab'] && !topSum.busy) {
+    topSum.busy = 1;
+    google.script.run.withSuccessHandler(d => { topSum.busy = 0; if (d) { cache[o + '_tab'] = d; topSum(); } }).withFailureHandler(() => { topSum.busy = 0; }).s6_get(o, 'tab');
+  }
+  let s = '';
+  const PI = kind === 'T' ? T : F; if (PI && PI.ing) s += ingCard(PI.ing);
+  if (T && T.sum && T.sum[0]) s += scCard(T.sum[0]);
+  if (F && F.sum && F.sum[0]) s += scCard(F.sum[0]);
+  $('sum').className = 'sum c3'; $('sum').innerHTML = s;
+}
+
+/* ===== Tripod 탭: QQQ / QLD / TQQQ 캔들 차트 + BUY/SELL ===== */
+const NM = { Q: 'QQQ', L: 'QLD', T: 'TQQQ', C: '현금' };
+const QSYM = ['QQQ', 'SGOV'], QC = {};
+QSYM.forEach(s => { QC[s] = { tf: s === 'SGOV' ? '1w' : '1d', raw: {}, live: null, v: null }; });
+const QCT = [['1h', '1시간'], ['1d', '1일'], ['1w', '1주']];
+const QCH = 224;
+function qcHtml() {
+  return QSYM.map(s => s === 'SGOV' ? '<div class="qc" data-sym="SGOV" style="margin-bottom:10px"><div class="pane-h"><span class="name">현금 (SGOV) <span id="qcP_SGOV">-</span> · VIX <span id="qcV_SGOV">-</span></span><span class="hint" id="qcL_SGOV" style="display:block;margin-top:3px"></span></div></div>' : '<div class="qc" data-sym="' + s + '" style="margin-bottom:10px"><div class="pane-h"><span class="name">' + (s === 'SGOV' ? '현금 (SGOV)' : s) + ' <span id="qcP_' + s + '">-</span> · VIX <span id="qcV_' + s + '">-</span></span></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px"><span class="tabs" id="qcTabs_' + s + '"></span><span class="tabs"><button data-z="in">＋ 확대</button><button data-z="out">－ 축소</button><button data-z="reset">처음</button></span></div><canvas id="qcv_' + s + '" style="height:' + QCH + 'px;cursor:grab"></canvas></div>').join('')
+    + '<div class="legend"><span><i style="background:var(--buy)"></i>▲ 이 종목으로 갈아탐</span><span><i style="background:var(--sell)"></i>▼ 이 종목에서 갈아탐 (라벨 = 전 종목 → 후 종목, 체결일 기준)</span></div><div class="hint" style="margin-bottom:6px">마우스 휠 / 두 손가락으로 확대·축소 · 좌우로 끌어 과거 데이터 보기</div>';
+}
+function qcTabs(s) { const el = $('qcTabs_' + s); if (el) el.innerHTML = QCT.map(t => '<button data-q="' + t[0] + '" class="' + (t[0] === QC[s].tf ? 'on' : '') + '">' + t[1] + '</button>').join(''); }
+function qcInit() { QSYM.forEach(s => { qcTabs(s); qcLoad(s); }); }
+document.addEventListener('click', e => {
+  const w = e.target.closest && e.target.closest('.qc'); if (!w) return; const s = w.dataset.sym;
+  const b = e.target.closest('[data-q]');
+  if (b) { QC[s].tf = b.dataset.q; QC[s].v = null; qcTabs(s); qcLoad(s); return; }
+  const z = e.target.closest('[data-z]');
+  if (z) { if (z.dataset.z === 'in') qcZoom(s, 1 / 1.5, .5); else if (z.dataset.z === 'out') qcZoom(s, 1.5, .5); else { QC[s].v = null; qcDraw(s); } }
+});
+function qcLoad(s) {
+  const tf = QC[s].tf;
+  if (QC[s].raw[tf]) qcDraw(s);
+  google.script.run.withSuccessHandler(d => { if (d && d.p && d.p.length) { QC[s].raw[d.tf] = d.p; if (d.live) QC[s].live = d.live; QSYM.forEach(k => { if (QC[k].raw[QC[k].tf]) qcDraw(k); }); } }).s6_getQ(s, tf);
+}
+function qcView(s, len) {
+  const c = QC[s], d = { '1h': 90, '1d': 120, '1w': 104 }[c.tf];
+  if (!c.v || c.v.tf !== c.tf) c.v = { tf: c.tf, cnt: Math.min(d, len), off: 0 };
+  const v = c.v; v.cnt = Math.max(15, Math.min(len, Math.round(v.cnt))); v.off = Math.max(0, Math.min(len - v.cnt, Math.round(v.off)));
+  return v;
+}
+function qcZoom(s, f, fx) {
+  const rows = QC[s].raw[QC[s].tf]; if (!rows) return; const v = qcView(s, rows.length), len = rows.length;
+  const left = len - v.off - v.cnt, anchor = left + fx * v.cnt, nc = Math.max(15, Math.min(len, Math.round(v.cnt * f)));
+  v.off = len - nc - (anchor - fx * nc); v.cnt = nc; qcView(s, len); qcDraw(s);
+}
+function qcDraw(s) {
+  if (!s) { QSYM.forEach(qcDraw); return; }
+  const cv = $('qcv_' + s); if (kind !== 'T' || !D) return; if (!cv && s !== 'SGOV') return;
+  const c = QC[s], rows = c.raw[c.tf]; if (!rows) return;
+  const V = qcView(s, rows.length), R = rows.slice(rows.length - V.off - V.cnt, rows.length - V.off), n = R.length, last = rows[rows.length - 1];
+  $('qcP_' + s).textContent = '$' + Number(c.live || last[4]).toFixed(2);
+  let vx = [...rows].reverse().find(r => r[5] != null); if (!vx) { for (const k of QSYM) { const rr = QC[k].raw['1d']; const f = rr && [...rr].reverse().find(r => r[5] != null); if (f) { vx = f; break; } } } $('qcV_' + s).textContent = vx ? vx[5].toFixed(2) : '-';
+  if (s === 'SGOV' && $('qcL_SGOV')) { const MK = D.marks || [], lc = [...MK].reverse().find(q => q.f === 'C' || q.t === 'C') || MK[MK.length - 1]; $('qcL_SGOV').textContent = lc ? '마지막 거래 ' + dstr(D.T[lc.k]) + ' · ' + NM[lc.f] + ' → ' + NM[lc.t] : '거래 내역 없음'; }
+  if (!cv) return;
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const padR = 54, padB = 20, padT = 24, pw = W - padR, ph = H - padT - padB - 12;
+  let lo = Infinity, hi = -Infinity; R.forEach(r => { if (r[3] < lo) lo = r[3]; if (r[2] > hi) hi = r[2]; });
+  const mg = (hi - lo) * .06 || 1; lo -= mg; hi += mg;
+  cv._pw = pw;
+  const X = i => (i + .5) / n * pw, Y = v => padT + (hi - v) / (hi - lo) * ph;
+  g.font = '11px sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.lineWidth = 1;
+  ticks(lo, hi, false).forEach(v => { const y = Math.round(Y(v)) + .5; g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); g.fillStyle = css('--ink3'); g.fillText('$' + Math.round(v), pw + 5, y); });
+  const cw = Math.max(1.5, pw / n * .62), up = css('--buy'), dn = css('--sell');
+  R.forEach((r, i) => {
+    const cl = r[4] >= r[1] ? up : dn, x = X(i);
+    g.strokeStyle = cl; g.fillStyle = cl; g.beginPath(); g.moveTo(Math.round(x) + .5, Y(r[2])); g.lineTo(Math.round(x) + .5, Y(r[3])); g.stroke();
+    const y1 = Y(Math.max(r[1], r[4])), y2 = Y(Math.min(r[1], r[4])); g.fillRect(x - cw / 2, y1, cw, Math.max(1, y2 - y1));
+  });
+  g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = css('--ink3');
+  [0, Math.floor(n / 3), Math.floor(n * 2 / 3), n - 1].forEach(i => { const d = new Date(R[i][0] * 1000 + 9 * 3600000); g.fillText((R[n - 1][0] - R[0][0] > 400 * 86400 ? "'" + String(d.getUTCFullYear()).slice(2) + '/' : '') + (d.getUTCMonth() + 1) + '/' + d.getUTCDate(), Math.max(14, Math.min(pw - 14, X(i))), H - 4); });
+  const span = (c.tf === '1w' ? 8 : 2) * 86400;
+  g.font = 'bold 10px sans-serif'; g.textAlign = 'center'; g.lineJoin = 'round'; const PL = [];
+  const CODE = { QQQ: 'Q', QLD: 'L', TQQQ: 'T', SGOV: 'C' }[s];
+  (D.marks || []).forEach(m => {
+    const buy = m.t === CODE; if (!buy && m.f !== CODE) return;
+    const td = D.T[m.k] * 86400 + 23 * 3600; let lo2 = 0, hi2 = n - 1, j = -1;
+    while (lo2 <= hi2) { const md = (lo2 + hi2) >> 1; if (R[md][0] <= td) { j = md; lo2 = md + 1; } else hi2 = md - 1; }
+    if (j < 0 || td - R[j][0] > span) return;
+    const x = X(j), cl = buy ? up : dn, y = buy ? Y(R[j][3]) + 5 : Y(R[j][2]) - 5, d = buy ? 1 : -1;
+    g.fillStyle = cl; g.beginPath(); g.moveTo(x, y); g.lineTo(x - 6, y + 11 * d); g.lineTo(x + 6, y + 11 * d); g.closePath(); g.fill();
+    const lb = NM[m.f] + ' → ' + NM[m.t], lw = g.measureText(lb).width + 4;
+    let row = 0, ly = 0; for (; row < 6; row++) { ly = y + (21 + row * 14) * d; if (!PL.some(p => p.d === d && p.r === row && Math.abs(p.x - x) < (p.w + lw) / 2)) break; }
+    if (row < 6 && ly > 6 && ly < H - padB - 2) { PL.push({ x: x, w: lw, d: d, r: row }); const lx = Math.max(lw / 2, Math.min(pw - lw / 2, x)); g.textBaseline = 'middle'; g.lineWidth = 3; g.strokeStyle = '#fff'; g.strokeText(lb, lx, ly); g.fillStyle = cl; g.fillText(lb, lx, ly); g.lineWidth = 1; }
+  });
+}
+window.addEventListener('resize', () => qcDraw());
+(function () {
+  const P = {}, PS = {};
+  const isC = e => e.target && e.target.id && e.target.id.indexOf('qcv_') === 0;
+  document.addEventListener('wheel', e => { if (!isC(e)) return; e.preventDefault(); qcZoom(e.target.id.slice(4), e.deltaY > 0 ? 1.2 : 1 / 1.2, Math.max(0, Math.min(1, e.offsetX / (e.target._pw || e.target.clientWidth)))); }, { passive: false });
+  document.addEventListener('pointerdown', e => { if (!isC(e)) return; P[e.pointerId] = e.clientX; PS[e.pointerId] = e.target.id.slice(4); try { e.target.setPointerCapture(e.pointerId); } catch (x) {} });
+  document.addEventListener('pointermove', e => {
+    if (P[e.pointerId] == null) return;
+    const s = PS[e.pointerId], cv = $('qcv_' + s), rows = QC[s].raw[QC[s].tf]; if (!cv || !rows) return;
+    const ids = Object.keys(P).filter(k => PS[k] === s), v = qcView(s, rows.length), pw = cv._pw || cv.clientWidth;
+    if (ids.length >= 2) {
+      const o = ids.find(k => +k !== e.pointerId), d0 = Math.abs(P[e.pointerId] - P[o]), d1 = Math.abs(e.clientX - P[o]);
+      P[e.pointerId] = e.clientX; if (d0 > 8 && d1 > 8) { const r = cv.getBoundingClientRect(); qcZoom(s, d0 / d1, Math.max(0, Math.min(1, ((e.clientX + P[o]) / 2 - r.left) / pw))); }
+      return;
+    }
+    const step = pw / v.cnt, bars = Math.trunc((e.clientX - P[e.pointerId]) / step);
+    if (bars !== 0) { v.off += bars; P[e.pointerId] += bars * step; qcDraw(s); }
+  });
+  const up = e => { delete P[e.pointerId]; delete PS[e.pointerId]; };
+  document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
+})();
+
+function fmtD(v, f) { if (f === '#') return Math.round(v).toLocaleString('en-US'); return f === '$2' ? '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '$' + Math.round(v).toLocaleString('en-US'); }
+function pc(v) { return (v >= 0 ? '+' : '') + v.toFixed(1) + '%'; }
+function cls(v) { return v >= 0 ? 'up' : 'down'; }
+function css(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function dstr(ed) { const d = new Date(ed * 86400000); return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0'); }
+
+function tabs() {
+  $('kTabs').innerHTML = KINDS.map(k => '<button data-k="' + k[0] + '" class="' + (k[0] === kind ? 'on' : '') + '">' + k[1] + '</button>').join('');
+  $('mTabs').innerHTML = MODES.map(m => '<button data-m="' + m[0] + '" class="' + (m[0] === mode ? 'on' : '') + '">' + m[1] + '</button>').join('');
+}
+$('kTabs').addEventListener('click', e => { const b = e.target.closest('[data-k]'); if (b) { kind = b.dataset.k; load(); } });
+$('mTabs').addEventListener('click', e => { const b = e.target.closest('[data-m]'); if (b) { mode = b.dataset.m; load(); } });
+
+function load() {
+  tabs(); hov = null; vid();
+  $('hint').textContent = HINTS[kind];
+  const key = kind + '_' + mode, my = ++seq;
+  if (cache[key]) { D = cache[key]; render(); return; }
+  $('panes').innerHTML = '<div class="msg">계산 중… (처음 한 번은 10~20초)</div>';
+  google.script.run
+    .withSuccessHandler(d => { if (my !== seq) return; if (!d) { $('panes').innerHTML = '<div class="msg">데이터를 불러오지 못했습니다. 잠시 후 다시 시도하세요.</div>'; return; } cache[key] = d; D = d; render(); })
+    .withFailureHandler(err => { if (my === seq) $('panes').innerHTML = '<div class="msg">불러오기 실패: ' + (err && err.message || err) + '</div>'; })
+    .s6_get(kind, mode);
+}
+
+function render() {
+  if (!D) return;
+  const dn = kind === 'T' ? 'QQQ' : 'QQQM';
+  const mkPane = (p, i, hh) => '<div class="pane-h"><span class="name">' + p.title + '</span><span class="val" id="hv' + i + '"></span></div><canvas id="cv' + i + '" style="height:' + hh + 'px"></canvas>';
+  $('panes').innerHTML = (kind === 'T' ? qcHtml() : '') + D.panes.map((p, i) => mkPane(p, i, kind === 'T' ? 252 : 360)).join('');
+  $('subsec').style.display = kind === 'T' ? 'none' : '';
+  if (kind === 'T') { $('subs').innerHTML = ''; qcInit(); } else $('subs').innerHTML = (D.subs || []).map((p, j) => mkPane(p, D.panes.length + j, 220)).join('');
+  let lg = D.panes[0].lines.map(l => '<span><i style="background:' + l.c + '"></i>' + l.n + '</span>').join('');
+  lg += '<span><i style="background:var(--buy)"></i>BUY (QQQM 복귀)</span><span><i style="background:var(--sell)"></i>SELL (방어로)</span><span><i style="background:#16a34a"></i>ADD (추가 투입)</span>';
+  lg += '<span><i class="sq" style="background:var(--buy)"></i>QQQM 보유</span><span><i class="sq" style="background:var(--sell)"></i>방어 (QQQM 50% + VOO 50%)</span>';
+  if (kind === 'T') lg = D.panes[0].lines.map(l => '<span><i style="background:' + l.c + '"></i>' + l.n + '</span>').join('') + '<span><i style="background:var(--buy)"></i>레버리지 확대 (라벨 = 갈아탄 종목)</span><span><i style="background:var(--sell)"></i>레버리지 축소</span><span><i class="sq" style="background:var(--buy)"></i>TQQQ 100% (3배)</span><span><i class="sq" style="background:#16a34a"></i>QQQ 100% (1배)</span><span><i class="sq" style="background:var(--sell)"></i>현금 (SGOV)</span>';
+  $('legend').innerHTML = lg; vidStart();
+  topSum();
+  $('yt').innerHTML = '<tr><th>연도</th>' + D.cols.map(c => '<th>' + c + '</th>').join('') + '<th>차이 (전략 − ' + dn + ')</th></tr>' + D.rows.map(r => '<tr><td>' + r.y + (r.p === 'start' ? ' <span class="hint">(시작~)</span>' : r.p === 'ytd' ? ' <span class="hint">(올해)</span>' : '') + '</td>' + r.v.map((v, i) => '<td class="' + cls(v) + (i === 0 ? ' s' : '') + '">' + pc(v) + '</td>').join('') + (r.v.length >= 2 ? (() => { const d = r.v[0] - r.v[1], z = Math.abs(d) < 0.05; return '<td class="' + (z ? '' : cls(d)) + '">' + (z ? '동일' : (d >= 0 ? '▲ 전략 높음 +' : '▼ 전략 낮음 ') + d.toFixed(1) + '%p') + '</td>'; })() : '') + '</tr>').join('');
+  { const MS = $('mtsec'), mo = D.months;
+    if (mo && mo.rows && mo.rows.length) {
+      MS.style.display = ''; $('mth').textContent = mo.y + '년 월별 수익률';
+      const df = v => { const d = v[0] - v[1], z = Math.abs(d) < 0.05; return '<td class="' + (z ? '' : cls(d)) + '">' + (z ? '동일' : (d >= 0 ? '▲ 전략 높음 +' : '▼ 전략 낮음 ') + d.toFixed(1) + '%p') + '</td>'; };
+      const tr = (lb, v, b) => '<tr' + (b ? ' style="font-weight:800"' : '') + '><td>' + lb + '</td>' + v.map((x, i) => '<td class="' + cls(x) + (i === 0 ? ' s' : '') + '">' + pc(x) + '</td>').join('') + df(v) + '</tr>';
+      $('mt').innerHTML = '<tr><th>월</th>' + D.cols.map(c => '<th>' + c + '</th>').join('') + '<th>차이 (전략 − ' + dn + ')</th></tr>' + mo.rows.map(r => tr(r.m + '월' + (r.cur ? ' <span class="hint">(진행 중)</span>' : ''), r.v, false)).join('') + tr('올해 누적', mo.ytd, true);
+    } else MS.style.display = 'none'; }
+  function fmtD2(v) { return '$' + Number(v).toFixed(2); }
+  const nHi = D.rows.filter(r => r.v[0] - r.v[1] >= 0.05).length, nLo = D.rows.filter(r => r.v[0] - r.v[1] <= -0.05).length;
+  let ft = '전략이 ' + dn + ' 보유보다 높은 해 ' + nHi + '번 · 낮은 해 ' + nLo + '번 · 같은 해 ' + (D.rows.length - nHi - nLo) + '번 (올해는 진행 중) · 차이는 %p(수익률의 차) · 시작 ' + D.start + ' (10년 전 이후 첫 거래일) · 최신 ' + D.end + ' · 갱신 ' + D.at + ' · 현재 ' + (D.now.inQ ? 'QQQM 보유 중' : '방어(QQQM 50% + VOO 50%) 보유 중') + (D.now.since ? ' (' + D.now.lastSig + ' ' + D.now.since + ')' : '');
+  ft += ' · 신호: SELL = VIX/20일평균 ≥ 1.15 & VIX ≥ 20 & QQQM 200일선 아래 / BUY = VIX ≤ 16 또는 VIX/20일평균 ≤ 0.9 / ADD = 보유 중 VIX 급등인데 200일선 위(눌림)이면 $200,000 추가 · 전환 간 최소 20거래일 · 신호 봉 종가 체결';
+  ft += ' · 연수익은 투입 시점을 반영한 IRR, 연도별 수익률은 투입금 영향 제외 · 배당 포함 수정종가 · QQQM은 2020-10 이전 QQQ로 이어 붙임 · 세금·수수료 제외 · 과거 성과이며 미래를 보장하지 않음';
+  if (kind === 'T') ft = tFoot(nHi, nLo);
+  $('foot').textContent = ft;
+  draw();
+}
+
+function tFoot(nHi, nLo) {
+  const N = D.now;
+  return 'Tripod 전략이 QQQ 보유보다 높은 해 ' + nHi + '번 · 낮은 해 ' + nLo + '번 · 같은 해 ' + (D.rows.length - nHi - nLo) + '번 (올해는 진행 중) · 시작 ' + D.start + ' · 최신 ' + D.end + ' · 갱신 ' + D.at + ' · 현재 ' + N.name + ' 보유 중 (' + N.since + ' 체결)' + (N.pend ? ' · 신호 대기: 다음 거래일에 ' + N.pend + '로 전환' : '') + ' · 시장 상태: 나스닥100(^NDX)이 250일선 ×1.01 위면 상승, ×0.95 아래면 하락, 그 사이는 직전 상태 유지 · 상승장: VIX 10일평균 < 28 이고 52주 고점 대비 낙폭 9% 이내면 TQQQ 100%(3배), 아니면 QQQ 100%(1배) · 하락장: VIX 10일평균 < 25이면 QQQ 100%(1배), 아니면 현금(SGOV) · 차트 라벨 = 갈아탄 종목(예: TQQQ → QQQ), 빨강 = 레버리지 확대, 파랑 = 축소 · 신호는 종가에 확정되고 체결은 다음 거래일 종가(차트 표시는 체결일) · 거래비용 3bp · 배당 포함 수정종가 · 세금 제외 · 과거 성과이며 미래를 보장하지 않음';
+}
+
+function ticks(lo, hi, log) {
+  const t = [];
+  if (log) { for (let e = Math.floor(Math.log10(lo)); e <= Math.ceil(Math.log10(hi)); e++) [1, 1.5, 2, 3, 5, 7].forEach(m => { const v = m * Math.pow(10, e); if (v >= lo && v <= hi) t.push(v); }); if (t.length > 8) return t.filter((_, i) => i % 2 === 0); return t; }
+  const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), st = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= raw);
+  for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) t.push(v);
+  return t;
+}
+
+function draw() {
+  if (!D) return;
+  D.panes.concat(D.subs || []).forEach((p, pi) => {
+    const cv = $('cv' + pi); if (!cv) return;
+    const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const n = D.T.length, padR = 62, padB = 20, padT = 8, pw = W - padR, ph = H - padT - padB;
+    let lo = Infinity, hi = -Infinity;
+    p.lines.forEach(l => l.v.forEach(x => { if (x < lo) lo = x; if (x > hi) hi = x; }));
+    const log = !!p.log && lo > 0;
+    const f = log ? Math.log : (x => x);
+    if (!log) { const m = (hi - lo) * .08 || 1; lo -= m; hi += m; }
+    const a = f(lo), b = f(hi), X = i => (i + .5) / n * pw, Y = v => padT + (b - f(v)) / (b - a || 1) * ph;
+    // 보유 구간 음영 (BUY=QQQM/TQQQ 보유=빨강, SELL=VOO·SCHD/현금=파랑)
+    (p.shade || D.shade).forEach(s => { g.fillStyle = s.s === 'BUY' ? 'rgba(232,50,60,.07)' : s.s === 'MID' ? 'rgba(245,158,11,.09)' : s.s === 'LOW' ? 'rgba(22,163,74,.09)' : 'rgba(47,107,219,.07)'; g.fillRect(X(s.a) - pw / n / 2, padT, (s.b - s.a + 1) * pw / n, ph); });
+    // 격자 + 가격축
+    g.font = '11px sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.lineWidth = 1;
+    ticks(lo, hi, log).forEach(v => { const y = Math.round(Y(v)) + .5; g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); g.fillStyle = css('--ink3'); g.fillText(p.fmt === '#' ? Math.round(v).toLocaleString('en-US') : p.fmt === '$2' ? '$' + (v >= 100 ? Math.round(v) : v.toFixed(v < 10 ? 2 : 1)) : (v >= 1e6 ? '$' + (v / 1e6).toFixed(2) + 'M' : '$' + Math.round(v / 1000) + 'K'), pw + 5, y); });
+    // 연도 눈금
+    g.textAlign = 'center'; g.textBaseline = 'alphabetic'; g.fillStyle = css('--ink3');
+    let lastY = '';
+    D.T.forEach((ed, i) => { const y = dstr(ed).slice(0, 4); if (y !== lastY) { lastY = y; const x = X(i); g.strokeStyle = css('--line'); g.beginPath(); g.moveTo(Math.round(x) + .5, padT); g.lineTo(Math.round(x) + .5, padT + ph); g.stroke(); if (x > 14 && x < pw - 14) g.fillText("'" + y.slice(2), x, H - 5); } });
+    // 선
+    p.lines.forEach(l => {
+      g.strokeStyle = l.c; g.lineWidth = l.w; g.lineJoin = 'round'; g.beginPath();
+      l.v.forEach((v, i) => { const x = X(i), y = Y(v); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.stroke();
+    });
+    // BUY/SELL 동그라미 (m 표시된 선 위)
+    const ml = p.lines.find(l => l.m);
+    if (ml) {
+      const MK = p.marks || D.marks, placed = [], colOf = s => s === 'BUY' ? css('--buy') : (s === 'ADD' ? '#16a34a' : css('--sell'));
+      MK.forEach(m => {
+        const x = X(m.k), y = Y(ml.v[m.k]);
+        g.fillStyle = colOf(m.s); g.strokeStyle = '#fff'; g.lineWidth = 1.5;
+        g.beginPath(); g.arc(x, y, 4.2, 0, 7); g.fill(); g.stroke();
+      });
+      // 문자 라벨: SELL 은 선 위쪽, BUY·ADD 는 선 아래쪽 (겹치면 비켜 놓고, 그래도 겹치면 생략)
+      g.font = 'bold 9px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      MK.forEach(m => {
+        const x = X(m.k), y = Y(ml.v[m.k]), lab = (m.f && m.t) ? NM[m.f] + ' → ' + NM[m.t] : m.s, tw = g.measureText(lab).width + 8, h = 13, up = m.s === 'SELL';
+        const bx = Math.max(1, Math.min(pw - tw - 1, x - tw / 2));
+        let done = false;
+        for (const sd of [up, !up]) {
+          for (let t = 0; t < 8; t++) {
+            const by = sd ? y - 8 - h - t * (h + 2) : y + 8 + t * (h + 2);
+            if (by < padT || by + h > padT + ph) break;
+            if (placed.some(q => bx < q.x + q.w + 1 && q.x < bx + tw + 1 && by < q.y + q.h + 1 && q.y < by + h + 1)) continue;
+            placed.push({ x: bx, y: by, w: tw, h: h });
+            g.strokeStyle = colOf(m.s); g.lineWidth = 1; g.beginPath(); g.moveTo(x, y + (sd ? -5 : 5)); g.lineTo(x, sd ? by + h : by); g.stroke();
+            g.fillStyle = '#fff'; g.beginPath(); g.roundRect(bx, by, tw, h, 3); g.fill(); g.stroke();
+            g.fillStyle = colOf(m.s); g.fillText(lab, bx + tw / 2, by + h / 2 + .5);
+            done = true; break;
+          }
+          if (done) break;
+        }
+      });
+      g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = '11px sans-serif';
+    }
+    // 십자선
+    if (hov != null) {
+      const x = X(hov); g.strokeStyle = 'rgba(33,38,51,.45)'; g.lineWidth = 1; g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(x, padT); g.lineTo(x, padT + ph); g.stroke(); g.setLineDash([]);
+      p.lines.forEach(l => { g.fillStyle = l.c; g.beginPath(); g.arc(x, Y(l.v[hov]), 3.2, 0, 7); g.fill(); });
+    }
+    const hv = $('hv' + pi); if (hv) {
+      const i = hov != null ? hov : n - 1;
+      hv.innerHTML = '<span style="color:var(--ink3)">' + dstr(D.T[i]) + '</span> ' + p.lines.map(l => '<span style="color:' + l.c + '">●</span> ' + l.n + ' <b>' + fmtD(l.v[i], p.fmt) + '</b>').join(' &nbsp; ');
+    }
+    cv._geo = { pw, n };
+  });
+}
+
+function onMove(e) {
+  const cv = e.currentTarget, r = cv.getBoundingClientRect(), g = cv._geo; if (!g) return;
+  const x = e.clientX - r.left;
+  hov = Math.max(0, Math.min(g.n - 1, Math.floor(x / g.pw * g.n))); draw();
+}
+document.addEventListener('pointermove', e => { if (e.target.tagName === 'CANVAS') onMove({ currentTarget: e.target, clientX: e.clientX }); });
+document.addEventListener('pointerleave', () => { hov = null; draw(); }, true);
+window.addEventListener('resize', draw);
+load();
+</script>
+</body>
+</html>
