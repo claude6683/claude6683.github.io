@@ -120,7 +120,7 @@
         <div class="cell"><div class="ch"><span>overview</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-ov.html"></iframe></div></div>
       </div>
       <div class="cell" id="c-news">
-        <div class="ch"><span>News<small>미증시 4 · 한국증시 2 · 코인 2</small></span><button class="xb">⤢</button></div>
+        <div class="ch"><span>News<small>미증시 5 · 한국증시 5 · 코인 3</small></span><button class="xb">⤢</button></div>
         <div class="cb"><div class="pane" id="nw" style="height:100%"></div></div>
       </div>
     </div>
@@ -222,9 +222,9 @@ async function loadXyz(){
 drawMon(); loadMon(); loadXyz();
 setInterval(loadMon, 20000); setInterval(loadXyz, 5000);
 
-/* ---------- B-3 뉴스 (미증시 4 · 한국증시 2 · 코인 2) ---------- */
+/* ---------- B-3 뉴스 (미증시 5 · 한국증시 5 · 코인 3) ---------- */
 const CATC = {'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
-const NEWS_N = {'미증시':4,'한국증시':2,'코인':2};
+const NEWS_N = {'미증시':5,'한국증시':5,'코인':3};
 let NEWS = null, LOWS = {}, SHEET = null;
 function drawNews(){
   const rows = NEWS || [], box = $('nw');
