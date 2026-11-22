@@ -1,11 +1,12 @@
-"""QQQM, VOO, SCHD 시세를 가져와 data.json 으로 저장 (GitHub Actions가 5분마다 실행)."""
+"""NASDAQ, S&P500, GOLD, AAPL 시세를 가져와 data.json 으로 저장 (GitHub Actions가 5분마다 실행)."""
 import json
 import time
 
 import pandas as pd
 import yfinance as yf
 
-SYMS = ["QQQM", "VOO", "SCHD"]
+SYMS = {"NASDAQ": "^IXIC", "S&P500": "^GSPC", "GOLD": "GC=F", "AAPL": "AAPL",
+        "QQQM": "QQQM", "VOO": "VOO", "SCHD": "SCHD"}  # 표시이름 -> 야후 티커 (QQQM·VOO·SCHD는 다른 페이지가 쓰므로 유지)
 RANGES = {
     "1H": ("1d", "1m"),
     "2D": ("5d", "5m"),
@@ -20,10 +21,10 @@ RANGES = {
 out = {"updated": int(time.time()), "data": {}}
 for tf, (period, interval) in RANGES.items():
     out["data"][tf] = {}
-    for s in SYMS:
+    for s, tk in SYMS.items():
         pts = []
         try:
-            df = yf.download(s, period=period, interval=interval,
+            df = yf.download(tk, period=period, interval=interval,
                              prepost=interval in ("1m", "5m", "30m"),
                              auto_adjust=False, progress=False)
             if isinstance(df.columns, pd.MultiIndex):
