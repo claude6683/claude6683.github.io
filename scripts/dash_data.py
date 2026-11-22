@@ -76,7 +76,27 @@ def news():
     return items
 
 
-out = {"updated": int(time.time()), "lows": lows(), "news": news()}
+MON = {"NASDAQ": "NQ=F", "S&P": "ES=F", "KOSPI": "^KS11", "US10Y": "^TNX", "BTC": "BTC-USD",
+       "USDKRW": "KRW=X", "GOLD": "GC=F", "WTI": "CL=F"}
+
+
+def mon():
+    """시트(Apps Script) 시세가 비었을 때 쓰는 예비 시세: 현재가 + 전일 대비 비율."""
+    res = []
+    for name, tk in MON.items():
+        try:
+            df = yf.download(tk, period="5d", interval="1d", auto_adjust=False, progress=False)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            c = df["Close"].dropna()
+            if len(c) >= 2:
+                res.append({"t": name, "p": round(float(c.iloc[-1]), 4), "c": float(c.iloc[-1] / c.iloc[-2] - 1)})
+        except Exception as e:
+            print("mon fail", name, e)
+    return res
+
+
+out = {"updated": int(time.time()), "lows": lows(), "news": news(), "mon": mon()}
 if not out["lows"] and not out["news"]:
     raise SystemExit("no data")
 json.dump(out, open("dash.json", "w"), ensure_ascii=False, separators=(",", ":"))

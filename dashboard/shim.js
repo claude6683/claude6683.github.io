@@ -22,7 +22,17 @@
       return r.text();
     }).then(function (tx) {
       var d = JSON.parse(tx);
-      if (!good(fn, d)) throw new Error('bad data');
+      if (!good(fn, d)) {   // 시트 시세가 비었으면 서버(dash.json)의 예비 시세로 대체
+        if (fn !== 'web_monitorData') throw new Error('bad data');
+        return fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/dash/dash.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) { return r.json(); }).then(function (j) {
+          var m = (j && j.mon) || [], have = {};
+          if (m.length < 3) throw new Error('bad data');
+          m.forEach(function (x) { have[x.t] = 1; });
+          var items = m.slice();
+          ((d && d.items) || []).forEach(function (x) { if (typeof x.p === 'number' && !have[x.t] && x.t !== 'KOSPI 야간') items.push(x); });
+          if (ok) ok({ at: d.at, items: items });
+        });
+      }
       if (d && d.error && Object.keys(d).length === 1) throw new Error(d.error);
       if (tx === cs) return;
       try { localStorage.setItem(k, tx); } catch (e) {}
