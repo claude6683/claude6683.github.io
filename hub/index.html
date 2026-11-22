@@ -335,6 +335,9 @@ function tidyTV() {
   const fitPair = () => { box.style.zoom = 1; const avail = host.firstElementChild.clientWidth - 16, w = box.scrollWidth; box.style.zoom = Math.max(0.35, Math.min(0.8, avail / w)); };
   fitPair(); setTimeout(fitPair, 300);
   const web = rows.find(r => tx(r)[0] === '웹사이트 주소'); if (web) web.style.display = 'none';
+  // 맨 위 'Trading View' 제목 박스(제목·Sound·기준 안내·갱신 줄) 숨김
+  const t0 = rows.findIndex(r => /^\s*Trading View\s*$/.test(tx(r)[0]));
+  if (t0 >= 0) for (let k = t0; k < rows.length; k++) { const t = rows[k].textContent.trim(); if (k > t0 && t !== '' && !/^기준|BP 갱신|자동점검/.test(t)) break; rows[k].style.display = 'none'; }
 }
 
 // ===== 큰 체결 소리 (BTC 무기한선물 100만 달러 이상 체결 시 종소리) =====
