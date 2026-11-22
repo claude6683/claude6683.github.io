@@ -71,7 +71,7 @@
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
   <div id="msg"></div>
   <footer>
-    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · SCHG·VOO·QQQM·SCHD·KOSPI: 약 15분 간격 갱신 (장 마감 시 마지막 값 유지).
+    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · XYZ100: Hyperliquid(XYZ100USDC.P) 실시간 · SCHG·VOO·QQQM·SCHD·KOSPI: 약 15분 간격 갱신 (장 마감 시 마지막 값 유지).
     기준 = 오늘 종가(마지막 봉의 종가), ±% = (가격 − 오늘 종가) ÷ 오늘 종가 × 100. 마우스 휠/핀치로 확대·축소, 드래그로 이동, 더블클릭으로 초기화. 시간은 한국시간 기준입니다.<br>
     SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전입니다. 원본과 100% 같지 않을 수 있습니다.<br>
     본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
@@ -85,6 +85,7 @@ const KST = 32400;
 const DATA_URL = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/smc-data/smc.json';
 const ASSETS = [
   {k:'BTC',  color:'#f7931a', src:'bn', sym:'BTCUSDT'},
+  {k:'XYZ100', color:'#f472b6', src:'hl', sym:'xyz:XYZ100'},
   {k:'SCHG', color:'#f472b6', src:'st'},
   {k:'VOO',  color:'#a78bfa', src:'st'},
   {k:'QQQM', color:'#4aa3ff', src:'st'},
@@ -148,6 +149,14 @@ async function fetchBinance(symb, c){
   }
   return rows;
 }
+async function fetchHL(coin, c){
+  const now=Date.now(), n=Math.min(c.pages*1000,4500), start=now-n*c.sec*1000;
+  const r=await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
+    body:JSON.stringify({type:'candleSnapshot',req:{coin:coin,interval:c.b,startTime:start,endTime:now}})});
+  if(!r.ok) throw new Error('hl '+r.status);
+  const j=await r.json();
+  return j.map(x=>({t:Math.floor(x.t/1000),o:+x.o,h:+x.h,l:+x.l,c:+x.c}));
+}
 async function fetchStocks(){
   try{
     const r = await fetch(DATA_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
@@ -181,6 +190,7 @@ async function load(){
   try{
     let rows;
     if(a.src==='bn') rows = await fetchBinance(a.sym, cfg);
+    else if(a.src==='hl') rows = await fetchHL(a.sym, cfg);
     else { if(!stockData) await fetchStocks(); rows = stockBars(sym, cfg); }
     if(id!==loadId) return;
     bars = clean(rows);
@@ -190,14 +200,14 @@ async function load(){
       $('legendInfo').textContent=''; return;
     }
     recompute(); renderChart(true); setMsg();
-    if(a.src==='bn') openWS(a);
+    if(a.src==='bn') openWS(a); else if(a.src==='hl') openHL(a);
   }catch(e){
     $('msg').textContent = '시세를 불러오지 못했습니다. 잠시 후 새로고침해 주세요. ('+e.message+')';
   }
 }
 function setMsg(){
   const a = ASSETS.find(x=>x.k===sym);
-  if(a.src==='bn') $('msg').textContent = `${sym} 실시간 수신 중 · 봉 ${bars.length}개`;
+  if(a.src==='bn'||a.src==='hl') $('msg').textContent = `${sym} 실시간 수신 중 · 봉 ${bars.length}개`;
   else { const t = stockUpdated ? new Date((stockUpdated+KST)*1000).toISOString().slice(5,16).replace('T',' ') : '-'; $('msg').textContent = `${sym} 마지막 갱신: ${t} (KST) · 봉 ${bars.length}개`; }
 }
 
@@ -491,6 +501,19 @@ $('chartbox').addEventListener('dblclick',()=>{ if(!tool) resetView(); });
 
 // ---------- live (Binance websocket) ----------
 function closeWS(){ clearTimeout(wsTimer); if(ws){ ws.onclose=null; try{ws.close();}catch(e){} ws=null; } }
+function openHL(a){
+  closeWS();
+  const myId=loadId, c=cfg;
+  ws=new WebSocket('wss://api.hyperliquid.xyz/ws');
+  ws.onopen=()=>ws.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:a.sym,interval:c.b}}));
+  ws.onmessage=ev=>{
+    const m=JSON.parse(ev.data); const k=m.data; if(m.channel!=='candle'||!k||!bars.length) return;
+    const t=Math.floor(k.t/1000), last=bars[bars.length-1], nb={t,o:+k.o,h:+k.h,l:+k.l,c:+k.c};
+    if(t===last.t) bars[bars.length-1]=nb; else if(t>last.t) bars.push(nb); else return;
+    if(!recT) recT=setTimeout(()=>{ recT=null; if(myId!==loadId) return; recompute(); renderChart(false); }, 1500);
+  };
+  ws.onclose=()=>{ if(myId===loadId) wsTimer=setTimeout(()=>openHL(a),3000); };
+}
 function openWS(a){
   closeWS();
   const myId=loadId, c=cfg;
