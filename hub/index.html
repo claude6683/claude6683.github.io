@@ -329,7 +329,7 @@ function tidyTV() {
   const cols = [...table.querySelectorAll('colgroup col')].slice(0, 7).map(c => c.outerHTML).join('');
   const mk = trs => { const d = document.createElement('div'); d.className = 'wrap'; d.style.cssText = 'flex:none;max-width:100%'; d.innerHTML = '<table><colgroup>' + cols + '</colgroup><tbody></tbody></table>'; trs.forEach(r => { d.querySelector('tbody').appendChild(r); [...r.querySelectorAll('td.first')].forEach(c => { c.style.position = 'static'; }); }); return d; };
   const host = document.createElement('tr'), span = Math.max(1, table.querySelectorAll('colgroup col').length);
-  host.innerHTML = '<td class="lone" colspan="' + span + '" style="padding:8px 8px 12px"><div class="pairbox" style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"></div></td>';
+  host.innerHTML = '<td class="lone" colspan="' + span + '" style="padding:8px 8px 12px"><div class="pairbox" style="display:flex;gap:12px;align-items:flex-start;flex-wrap:nowrap;overflow-x:auto;max-width:calc(100vw - 40px);zoom:' + (MOBILE() ? 0.55 : 0.8) + '"></div></td>';
   rows[y0].parentNode.insertBefore(host, rows[y0]);
   const box = host.querySelector('.pairbox'); box.appendChild(mk(A)); box.appendChild(mk(B));
 }

@@ -45,9 +45,9 @@
   .mon-k{border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:90px;
          background:linear-gradient(160deg,#262a31 0%,#181b20 55%,#121418 100%);
          box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -4px 0 rgba(0,0,0,.45),0 6px 14px rgba(0,0,0,.5);border:1px solid #2a2f37}
-  .mon-t{font-size:clamp(14px,1.7vw,24px);font-weight:800;letter-spacing:.5px}
-  .mon-v{font-size:clamp(12px,1.35vw,18px);font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
-  .mon-p{font-size:clamp(13px,1.5vw,20px);font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
+  .mon-t{font-size:calc(clamp(14px,1.7vw,24px) * var(--ms,1));font-weight:800;letter-spacing:.5px}
+  .mon-v{font-size:calc(clamp(12px,1.35vw,18px) * var(--ms,1));font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
+  .mon-p{font-size:calc(clamp(13px,1.5vw,20px) * var(--ms,1));font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
   .mon-s{min-width:.6em;text-align:center}
   .mon-k.up{color:var(--up);text-shadow:0 0 10px rgba(62,224,143,.35)}
   .mon-k.dn{color:var(--dn);text-shadow:0 0 10px rgba(255,95,95,.35)}
@@ -111,7 +111,7 @@
     <div class="rh"><span class="rt">상단 · 시세 / 차트 / 뉴스</span><button class="xb" data-x="row">⤢</button></div>
     <div class="cells c3">
       <div class="cell" id="c-mon">
-        <div class="ch"><span>시세 전광판<small id="monAt"></small></span><button class="xb">⤢</button></div>
+        <div class="ch"><span>시세 전광판<small id="monAt"></small></span><span style="display:flex;gap:4px"><button class="xb" id="msm">−</button><button class="xb" id="mbg">+</button><button class="xb">⤢</button></span></div>
         <div class="cb"><div class="mon-g" id="monG"></div></div>
       </div>
       <div class="stack">
@@ -179,6 +179,11 @@ document.addEventListener('click', e=>{
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape'){ closeAll(); setTimeout(()=>window.dispatchEvent(new Event('resize')),50); } });
 
+/* 전광판 글자 크기 +/− (글자만 커지고 작아짐, 기억함) */
+let MS = 1; try{ MS = +localStorage.getItem('dashMs') || 1; }catch(e){}
+function setMs(d){ MS = Math.max(.6, Math.min(3.5, +(MS + d).toFixed(2))); try{ localStorage.setItem('dashMs', MS); }catch(e){} $('c-mon').style.setProperty('--ms', MS); }
+$('c-mon').style.setProperty('--ms', MS);
+$('msm').onclick = e=>{ e.stopPropagation(); setMs(-.15); }; $('mbg').onclick = e=>{ e.stopPropagation(); setMs(.15); };
 /* ---------- B-1 시세 전광판 12칸 ---------- */
 const ORDER = ['BTC','NASDAQ','S&P','SCHG','XYZ100','SCHD','US10Y','KOSPI','USDKRW','GOLD','WTI','KIMP'];
 const MON = {};                                   // 이름 -> {p, c(비율)}
