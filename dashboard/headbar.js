@@ -8,12 +8,14 @@ var css=".tb{position:relative;height:30px;display:flex;align-items:center;backg
 +".snd-last.flash{animation:sndf .7s ease-out}@keyframes sndf{from{background:#fff1a8;color:#000}to{background:transparent}}"
 +".bj{flex:none;margin:0 10px;font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}"
 +"#tick{flex:1;min-width:0;overflow:hidden;height:30px;line-height:30px;font-size:12px;font-weight:700;color:#FF4D4F;white-space:nowrap}"
-+"#tick i{font-style:normal;display:inline-block;padding-left:100%;animation:tickMarq var(--mqd,40s) linear infinite}"
-+"@keyframes tickMarq{from{transform:translateX(0)}to{transform:translateX(-100%)}}"
++"#tick i{font-style:normal;display:inline-block;white-space:nowrap;animation:tickMarq var(--mqd,40s) linear infinite}"
++"#tick i b{font-weight:700;padding-right:48px}"
++"@keyframes tickMarq{from{transform:translateX(0)}to{transform:translateX(var(--sh,-50%))}}"
++".aap{flex:none;margin:0 10px;font-size:12px;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums}"
 +"@media(max-width:640px){.snd-last{display:none}}";
 var st=document.createElement('style');st.textContent=css;document.head.appendChild(st);
 var bar=document.createElement('div');bar.className='tb';
-bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><span id="bjBox" class="bj"></span><span id="xyzBox" class="bj"></span><div id="tick"><i id="tickIn"></i></div>';
+bar.innerHTML='<span class="snd-box"><button id="sndBtn" class="snd-btn" onclick="sndToggle()"></button><span id="sndLast" class="snd-last"></span></span><span id="bjBox" class="bj"></span><span id="xyzBox" class="bj"></span><span id="aapBox" class="aap"></span><div id="tick"><i id="tickIn"></i></div>';
 (document.getElementById('headline')||document.body).appendChild(bar);
 // ===== 큰 체결 소리 (BTC 무기한선물 100만 달러 이상 체결 시 종소리) =====
 // 바이낸스·바이비트·OKX 공개 체결 스트림을 직접 받아, 한 건이 기준 금액 이상이면 소리를 냄.
@@ -176,17 +178,29 @@ if (SND.on) {
 
 sndLabel();
 function monPrice(t,p){if(typeof p!=='number')return '—';var d={'BTC':0,'NASDAQ':0,'S&P':0,'KOSPI':0,'KOSPI 야간':0,'USDKRW':0,'KIMP':0,'US10Y':3,'GOLD':1}[t];var n=d==null?2:d;var s=(n===0?Math.floor(p):p).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});return t==='US10Y'?s+'%':s;}
-function tickFit(){try{var el=document.getElementById('tickIn');el.style.setProperty('--mqd',Math.max(20,el.offsetWidth/50).toFixed(1)+'s');}catch(e){}}
+var tickBase='',tickHtml='';
+function tickFit(){try{var el=document.getElementById('tickIn'),box=document.getElementById('tick');if(!tickBase)return;
+el.innerHTML='<b>'+tickBase+'</b>';var w=el.firstChild.offsetWidth||1,cw=box.clientWidth||600;
+var n=Math.max(2,Math.ceil(cw/w)+1),h='';for(var k=0;k<n;k++)h+='<b>'+tickBase+'</b>';
+el.innerHTML=h;el.style.setProperty('--sh',(-w)+'px');el.style.setProperty('--mqd',Math.max(15,w/50).toFixed(1)+'s');}catch(e){}}
 function tickDraw(d){try{var ORDER=['BTC','NASDAQ','S&P','USDKRW','KIMP','GOLD','US10Y','WTI','KOSPI'];var key=function(t){return t==='KOSPI 야간'?'KOSPI':t};
 var items=((d&&d.items)||[]).slice().sort(function(p,q){var i=ORDER.indexOf(key(p.t)),j=ORDER.indexOf(key(q.t));return(i<0?99:i)-(j<0?99:j)});
 var parts=items.map(function(x){var c=x.c,has=typeof c==='number'&&isFinite(c);var a=has?Math.abs(c*100).toFixed(1):'';var pct=!has?'—':(a==='0.0'?'':(c>0?'+':'-'))+a+'%';var col=!has||a==='0.0'?'#9aa3b2':(c>0?'#FF4D4F':'#3B82F6');return '<span style="color:'+col+'">'+(monPrice(x.t,x.p)+' '+pct+' '+key(x.t).slice(0,3).toUpperCase()).replace(/&/g,'&amp;')+'</span>'});
-if(!parts.length)return;document.getElementById('tickIn').innerHTML=parts.join(' <span style="color:#6b7280">/</span> ');tickFit();}catch(e){}}
-function tickLoad(){try{google.script.run.withSuccessHandler(tickDraw).withFailureHandler(function(){}).web_monitorData();}catch(e){}}
+if(!parts.length)return;var h=parts.join(' <span style="color:#6b7280">/</span> ');
+if(h===tickBase)return; /* 같은 내용이면 다시 그리지 않음 → 애니메이션 끊김/깜빡임 방지 */
+tickBase=h;tickFit();}catch(e){}}
+function tickLoad(){try{google.script.run.withSuccessHandler(tickDraw).withFailureHandler(function(){setTimeout(tickLoad,15000)}).web_monitorData();}catch(e){setTimeout(tickLoad,15000)}}
 tickLoad();setInterval(tickLoad,300000);window.addEventListener('resize',tickFit);
 function bjLoad(){try{fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/bj/bj.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){var el=document.getElementById('bjBox');if(!el)return;var p=d&&d.pos;if(!p){el.textContent='';return;}var up=p.pnl>=0,lg=p.side==='LONG';var f=function(n,k){return Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:k})};el.innerHTML='<span style="color:#9aa3b2">웨돔</span> <span style="color:'+(lg?'#FF4D4F':'#3B82F6')+'">BTC '+(lg?'롱':'숏')+' '+f(p.size,0)+'</span> <span style="color:'+(up?'#FF4D4F':'#3B82F6')+'">'+(up?'+':'-')+f(p.pnl,0)+'</span>';}).catch(function(){});}catch(e){}}
 bjLoad();setInterval(bjLoad,60000);
 // XYZ100 (Hyperliquid XYZ100USDC.P) 시세: 소수점 없음 + 전일 대비 ±% (상승 빨강/하락 파랑)
 function xyzLoad(){try{fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'metaAndAssetCtxs',dex:'xyz'})}).then(function(r){return r.json()}).then(function(d){var i=d[0].universe.findIndex(function(u){return u.name==='xyz:XYZ100'});if(i<0)return;var c=d[1][i],p=+c.markPx,pv=+c.prevDayPx;if(!(p>0)||!(pv>0))return;var pc=(p/pv-1)*100,up=pc>=0,el=document.getElementById('xyzBox');if(!el)return;el.innerHTML='<span style="color:'+(up?'#FF4D4F':'#3B82F6')+'">'+Math.floor(p).toLocaleString('en-US')+' '+(up?'+':'-')+Math.abs(pc).toFixed(2)+'%</span>';}).catch(function(){});}catch(e){}}
 xyzLoad();setInterval(xyzLoad,10000);
+// AAPL 52주 고점 대비 하락률 (GitHub Actions가 5분마다 aapl.json 갱신). -10% 이하만 Buy, 나머지 Hold
+function aapShow(d){var el=document.getElementById('aapBox');if(!el||!d||typeof d.dd!=='number')return;var buy=d.dd<=-10;var t=(d.dd>0?'+':'')+d.dd.toFixed(1)+'% '+(buy?'Buy':'Hold');
+el.innerHTML='<span title="AAPL 52주 고점 대비" style="color:'+(buy?'#FF4D4F':'#9aa3b2')+'">('+t+')</span>';}
+function aapLoad(){try{var c=localStorage.getItem('aapDD');if(c&&!document.getElementById('aapBox').textContent)aapShow(JSON.parse(c));}catch(e){}
+try{fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/bj/aapl.json?t='+Date.now()).then(function(r){return r.json()}).then(function(d){aapShow(d);try{localStorage.setItem('aapDD',JSON.stringify(d))}catch(e){}}).catch(function(){});}catch(e){}}
+aapLoad();setInterval(aapLoad,60000);
 window.sndToggle=sndToggle;
 })();

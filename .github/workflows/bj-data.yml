@@ -18,13 +18,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 scripts/bj_data.py
+      - run: python3 scripts/aapl_data.py || true
       - name: publish bj branch
         run: |
-          mkdir out && mv bj.json out/
+          mkdir out && mv bj.json out/ && (mv aapl.json out/ 2>/dev/null || true)
           cd out
           git init -q -b bj
           git config user.name "github-actions"
           git config user.email "github-actions@users.noreply.github.com"
-          git add bj.json
+          git add .
           git commit -qm "bj"
           git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" bj
