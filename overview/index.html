@@ -68,7 +68,7 @@
     <span class="lbl">지표</span>
     <div class="grp" id="inds"><button data-i="vw100">VWMA100</button><button data-i="vw200">VWMA200</button><button data-i="vw300">VWMA300</button><button data-i="bb">볼린저</button><button data-i="rsi">RSI</button></div>
     <span class="lbl">그리기</span>
-    <div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
+    <div class="grp" id="dtools"><button data-d="measure">📏 재기</button><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div>
     <span class="lbl" id="cnote"></span>
   </div>
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
@@ -232,6 +232,17 @@ function drawOne(d,b,L,prev,hl){
   const B = d.b ? xy(d.b,b) : null; if(!B){ cx.setLineDash([]); return; }
   if(d.type==='trend'){ cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); [A,B].forEach(q=>{ cx.beginPath(); cx.arc(q.x,q.y,3,0,6.3); cx.fill(); }); }
   else if(d.type==='rect'){ cx.fillStyle='rgba(74,163,255,.12)'; cx.fillRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); cx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); }
+  else if(d.type==='measure'){
+    const up=d.b.p>=d.a.p, col=up?'#22c55e':'#ef4444', x1=Math.min(A.x,B.x), y1=Math.min(A.y,B.y), w=Math.abs(B.x-A.x), h=Math.abs(B.y-A.y);
+    cx.fillStyle=up?'rgba(34,197,94,.15)':'rgba(239,68,68,.15)'; cx.strokeStyle=col; cx.fillRect(x1,y1,w,h); cx.strokeRect(x1,y1,w,h);
+    cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); cx.beginPath(); cx.arc(B.x,B.y,3,0,6.3); cx.fillStyle=col; cx.fill();
+    const dp=d.b.p-d.a.p, pc=(d.b.p/d.a.p-1)*100, dt=Math.abs(d.b.t-d.a.t), bars=Math.round(dt/(curCfg?curCfg.sec:60));
+    const dd=Math.floor(dt/86400), hh=Math.floor(dt%86400/3600), mm=Math.floor(dt%3600/60);
+    const tm=(dd?dd+'일 ':'')+(hh?hh+'시간 ':'')+((!dd&&mm)?mm+'분':'');
+    const l1=(dp>=0?'+':'')+fmtP(null,dp)+'  ('+(pc>=0?'+':'')+pc.toFixed(2)+'%)', l2=bars+'봉 · '+(tm.trim()||'0분');
+    cx.font='bold 12px sans-serif'; const tw=Math.max(cx.measureText(l1).width,cx.measureText(l2).width)+14, tx=Math.min(Math.max(x1+w/2-tw/2,2),L.pl-tw-2), ty=up?Math.max(y1-44,2):Math.min(y1+h+6,L.pb-40);
+    cx.fillStyle=col; cx.fillRect(tx,ty,tw,38); cx.fillStyle='#fff'; cx.fillText(l1,tx+7,ty+16); cx.font='11px sans-serif'; cx.fillText(l2,tx+7,ty+31);
+  }
   else if(d.type==='fib'){
     const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x);
     FIB.forEach((lv,i)=>{
