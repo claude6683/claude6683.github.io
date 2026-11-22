@@ -5,7 +5,8 @@ import time
 import pandas as pd
 import yfinance as yf
 
-SYMS = ["SCHG", "VOO", "QQQM", "SCHD"]
+SYMS = ["SCHG", "VOO", "QQQM", "SCHD", "^KS11"]
+ALIAS = {"^KS11": "KOSPI"}  # 야후 심볼 -> 차트 키
 JOBS = {            # 키: (기간, 봉간격, 최대 봉수)
     "1h": ("730d", "1h", 5000),
     "1d": ("max", "1d", 3000),
@@ -22,7 +23,7 @@ def to_ts(t):
 
 out = {"updated": int(time.time()), "data": {}}
 for s in SYMS:
-    out["data"][s] = {}
+    out["data"][ALIAS.get(s, s)] = {}
     for key, (period, interval, cap) in JOBS.items():
         rows = []
         try:
@@ -35,7 +36,7 @@ for s in SYMS:
             rows = rows[-cap:]
         except Exception as e:  # 한 종목 실패해도 나머지는 저장
             print("fail", s, key, e)
-        out["data"][s][key] = rows
+        out["data"][ALIAS.get(s, s)][key] = rows
 
 with open("smc.json", "w") as f:
     json.dump(out, f, separators=(",", ":"))

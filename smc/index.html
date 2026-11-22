@@ -71,7 +71,7 @@
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
   <div id="msg"></div>
   <footer>
-    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · SCHG·VOO·QQQM·SCHD: 약 15분 간격 갱신 (장 마감 시 마지막 값 유지).
+    BTC·GOLD: 바이낸스 실시간 (GOLD = PAXG, 금 연동 토큰) · SCHG·VOO·QQQM·SCHD·KOSPI: 약 15분 간격 갱신 (장 마감 시 마지막 값 유지).
     기준 = 오늘 종가(마지막 봉의 종가), ±% = (가격 − 오늘 종가) ÷ 오늘 종가 × 100. 마우스 휠/핀치로 확대·축소, 드래그로 이동, 더블클릭으로 초기화. 시간은 한국시간 기준입니다.<br>
     SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전입니다. 원본과 100% 같지 않을 수 있습니다.<br>
     본 사이트는 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
@@ -90,6 +90,7 @@ const ASSETS = [
   {k:'QQQM', color:'#4aa3ff', src:'st'},
   {k:'SCHD', color:'#34d399', src:'st'},
   {k:'GOLD', color:'#facc15', src:'bn', sym:'PAXGUSDT'},
+  {k:'KOSPI', color:'#fb7185', src:'st'},
 ];
 const TF = {
   '1H': {b:'1h', sec:3600,   intraday:true, pages:2, skey:'1h'},
