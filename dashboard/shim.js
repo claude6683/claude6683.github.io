@@ -3,10 +3,17 @@
 (function () {
   var BASE = 'https://script.google.com/macros/s/AKfycbxadwf6a-UyfC5wyIQ800rlRFw-yrVzVwUFNqML4mYmGILQ_LEI7EAfcx2qeKm8oTNZVg/exec';
   var PFX = 'dash1_';
+  // 시세 응답에서 가격이 거의 비어 있으면(Apps Script 일시 오류) 불량으로 보고 저장/표시하지 않음
+  function good(fn, d) {
+    if (fn !== 'web_monitorData') return true;
+    var n = 0, it = (d && d.items) || [];
+    it.forEach(function (x) { if (typeof x.p === 'number') n++; });
+    return n >= 3;
+  }
   function call(fn, args, ok, fail) {
     var k = PFX + fn + '|' + args.join('|'), cs = null, hit = false;
     try { cs = localStorage.getItem(k); } catch (e) {}
-    if (cs) { try { var c = JSON.parse(cs); hit = true; if (ok) ok(c); } catch (e) { console.error(e); } }
+    if (cs) { try { var c = JSON.parse(cs); if (good(fn, c)) { hit = true; if (ok) ok(c); } else { cs = null; } } catch (e) { console.error(e); } }
     var q = 'api=' + encodeURIComponent(fn);
     if (args[0] != null) q += '&a=' + encodeURIComponent(args[0]);
     if (args[1] != null) q += '&b=' + encodeURIComponent(args[1]);
@@ -15,6 +22,7 @@
       return r.text();
     }).then(function (tx) {
       var d = JSON.parse(tx);
+      if (!good(fn, d)) throw new Error('bad data');
       if (d && d.error && Object.keys(d).length === 1) throw new Error(d.error);
       if (tx === cs) return;
       try { localStorage.setItem(k, tx); } catch (e) {}

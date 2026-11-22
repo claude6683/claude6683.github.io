@@ -184,7 +184,7 @@ el.innerHTML='<b>'+tickBase+'</b>';var w=el.firstChild.offsetWidth||1,cw=box.cli
 var n=Math.max(2,Math.ceil(cw/w)+1),h='';for(var k=0;k<n;k++)h+='<b>'+tickBase+'</b>';
 el.innerHTML=h;el.style.setProperty('--sh',(-w)+'px');el.style.setProperty('--mqd',Math.max(15,w/50).toFixed(1)+'s');}catch(e){}}
 function tickDraw(d){try{var ORDER=['BTC','NASDAQ','S&P','USDKRW','KIMP','GOLD','US10Y','WTI','KOSPI'];var key=function(t){return t==='KOSPI 야간'?'KOSPI':t};
-var items=((d&&d.items)||[]).slice().sort(function(p,q){var i=ORDER.indexOf(key(p.t)),j=ORDER.indexOf(key(q.t));return(i<0?99:i)-(j<0?99:j)});
+var LK=window.__tickLast=window.__tickLast||{};((d&&d.items)||[]).forEach(function(x){if(typeof x.p==='number')LK[x.t]=x});var items=Object.keys(LK).map(function(k){return LK[k]}).sort(function(p,q){var i=ORDER.indexOf(key(p.t)),j=ORDER.indexOf(key(q.t));return(i<0?99:i)-(j<0?99:j)});
 var parts=items.map(function(x){var c=x.c,has=typeof c==='number'&&isFinite(c);var a=has?Math.abs(c*100).toFixed(1):'';var pct=!has?'—':(a==='0.0'?'':(c>0?'+':'-'))+a+'%';var col=!has||a==='0.0'?'#9aa3b2':(c>0?'#FF4D4F':'#3B82F6');return '<span style="color:'+col+'">'+(monPrice(x.t,x.p)+' '+pct+' '+key(x.t).slice(0,3).toUpperCase()).replace(/&/g,'&amp;')+'</span>'});
 if(!parts.length)return;var h=parts.join(' <span style="color:#6b7280">/</span> ');
 if(h===tickBase)return; /* 같은 내용이면 다시 그리지 않음 → 애니메이션 끊김/깜빡임 방지 */
