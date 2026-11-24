@@ -1,4 +1,5 @@
-"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(미증시 5·한국증시 5·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
+"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(Save 4·미증시 3·한국증시 3·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
+import datetime
 import json
 import time
 import urllib.parse
@@ -40,14 +41,36 @@ def lows():
 
 
 NEWS = [  # (분류, 검색어, 개수)
-    ("미증시", "(뉴욕증시 OR 나스닥 OR 미국증시) -비트코인 -코인 -이더리움 -가상자산", 5),
-    ("한국증시", "코스피 OR 코스닥", 5),
+    ("미증시", "(뉴욕증시 OR 나스닥 OR 미국증시) -비트코인 -코인 -이더리움 -가상자산", 3),
+    ("한국증시", "코스피 OR 코스닥", 3),
     ("코인", "비트코인 OR 가상자산", 3),
 ]
 
 
+def save_news(n=4):
+    """세이브티커 SAVE PICK 속보 최신 n건."""
+    u = "https://www.saveticker.com/api/news/list?page=1&page_size=40&sort=created_at_desc&label_group=2&label_name=1"
+    try:
+        j = json.load(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30))
+    except Exception as e:
+        print("save news fail", e)
+        return []
+    rows = []
+    for x in j.get("news_list", []):
+        if x.get("channel") != "save-pick" or not any(l.get("name") == "속보" for l in x.get("content_labels", [])):
+            continue
+        try:
+            at = int(datetime.datetime.fromisoformat(x["created_at"].replace("Z", "+00:00")).timestamp())
+        except Exception:
+            at = 0
+        rows.append({"cat": "Save", "at": at, "t": (x.get("title") or "").strip(), "src": x.get("source") or "SAVE PICK",
+                     "l": "https://www.saveticker.com/news?label_group=2"})
+    rows.sort(key=lambda r: -r["at"])
+    return rows[:n]
+
+
 def news():
-    items = []
+    items = save_news(4)
     for cat, q, n in NEWS:
         u = "https://news.google.com/rss/search?" + urllib.parse.urlencode(
             {"q": q + " when:1d", "hl": "ko", "gl": "KR", "ceid": "KR:ko"})

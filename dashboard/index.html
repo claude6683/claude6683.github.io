@@ -120,7 +120,7 @@
         <div class="cell"><div class="ch"><span>overview</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-ov.html"></iframe></div></div>
       </div>
       <div class="cell" id="c-news">
-        <div class="ch"><span>News<small>미증시 5 · 한국증시 5 · 코인 3</small></span><button class="xb">⤢</button></div>
+        <div class="ch"><span>News<small>Save 4 · 미증시 3 · 한국증시 3 · 코인 3</small></span><button class="xb">⤢</button></div>
         <div class="cb"><div class="pane" id="nw" style="height:100%"></div></div>
       </div>
     </div>
@@ -257,9 +257,9 @@ async function loadSpcx(){
 drawMon(); loadMon(); loadXyz(); loadSpcx();
 setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 15000);
 
-/* ---------- B-3 뉴스 (미증시 5 · 한국증시 5 · 코인 3) ---------- */
-const CATC = {'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
-const NEWS_N = {'미증시':5,'한국증시':5,'코인':3};
+/* ---------- B-3 뉴스 (Save 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
+const CATC = {'Save':['#ffe9ef','#d6336c'],'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
+const NEWS_N = {'Save':4,'미증시':3,'한국증시':3,'코인':3};
 let NEWS = null, LOWS = {}, SHEET = null;
 function drawNews(){
   const rows = NEWS || [], box = $('nw');
@@ -307,7 +307,7 @@ async function loadDash(){
     const r = await fetch(DASH_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json(); LOWS = j.lows||{};
-    const order = ['미증시','한국증시','코인'];
+    const order = ['Save','미증시','한국증시','코인'];
     drawSp(j.spcx);
     NEWS = (j.news||[]).slice().sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat) || b.at-a.at);
     if(!NEWS.length) NEWS = null;
@@ -396,7 +396,7 @@ function loadSheet(){
   }).withFailureHandler(()=>{}).web_getData();
 }
 loadSheet(); loadDash();
-setInterval(loadSheet, 60000); setInterval(loadDash, 10*60000);
+setInterval(loadSheet, 60000); setInterval(loadDash, 2*60000);
 
 /* ---------- B-5 핫이슈 5 · 속보 20 ---------- */
 function drawFlash(d){

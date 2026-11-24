@@ -2,7 +2,7 @@ name: dash-data
 
 on:
   schedule:
-    - cron: "*/30 * * * *"   # 30분마다
+    - cron: "*/5 * * * *"   # 5분마다
   workflow_dispatch:
 
 permissions:
