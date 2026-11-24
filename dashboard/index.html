@@ -260,7 +260,17 @@ setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 1
 /* ---------- B-3 뉴스 (Save 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
 const CATC = {'Save':['#ffe9ef','#d6336c'],'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
 const NEWS_N = {'Save':4,'미증시':3,'한국증시':3,'코인':3};
-let NEWS = null, LOWS = {}, SHEET = null;
+const SAVE_URL = '';   // Cloudflare Worker 주소 (worker/save-proxy.js 배포 후 입력)
+let NEWS = null, LOWS = {}, SHEET = null, SAVEN = [];
+async function loadSave(){
+  if(!SAVE_URL) return;
+  try{
+    const j = await (await fetch(SAVE_URL, {cache:'no-store'})).json();
+    SAVEN = (j.news||[]).slice(0,4);
+    NEWS = (NEWS||[]).filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['Save','미증시','한국증시','코인'].indexOf(a.cat)-['Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
+    drawNews();
+  }catch(e){}
+}
 function drawNews(){
   const rows = NEWS || [], box = $('nw');
   if(!rows.length){ box.innerHTML = '<div class="msg">뉴스를 불러오는 중…</div>'; return; }
@@ -313,6 +323,7 @@ async function loadDash(){
     if(!NEWS.length) NEWS = null;
   }catch(e){ NEWS = null; }
   if(!NEWS) NEWS = newsFromSheet();
+  if(SAVEN.length) NEWS = NEWS.filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['Save','미증시','한국증시','코인'].indexOf(a.cat)-['Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
   drawNews(); drawTable();
 }
 
@@ -395,7 +406,7 @@ function loadSheet(){
     if(at && isFinite(+at)) $('tblAt').textContent = ' 갱신 '+p2(KST(+at).getUTCMonth()+1)+'-'+p2(KST(+at).getUTCDate())+' '+p2(KST(+at).getUTCHours())+':'+p2(KST(+at).getUTCMinutes());
   }).withFailureHandler(()=>{}).web_getData();
 }
-loadSheet(); loadDash();
+loadSheet(); loadDash(); loadSave(); setInterval(loadSave, 2*60000);
 setInterval(loadSheet, 60000); setInterval(loadDash, 2*60000);
 
 /* ---------- B-5 핫이슈 5 · 속보 20 ---------- */
