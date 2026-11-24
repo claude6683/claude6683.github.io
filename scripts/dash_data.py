@@ -96,7 +96,36 @@ def mon():
     return res
 
 
-out = {"updated": int(time.time()), "lows": lows(), "news": news(), "mon": mon()}
+def spcx_news():
+    """SPCX(SpaceX) 관련 뉴스만: 핫이슈 10(관련도순) + 속보 20(최신순)."""
+    rows, seen = [], set()
+    for q, hl, gl, ceid in [("SPCX OR SpaceX 상장 OR 스페이스X when:2d", "ko", "KR", "KR:ko"), ("SPCX OR SpaceX IPO when:2d", "en-US", "US", "US:en")]:
+        u = "https://news.google.com/rss/search?" + urllib.parse.urlencode({"q": q, "hl": hl, "gl": gl, "ceid": ceid})
+        try:
+            root = ET.fromstring(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=30).read())
+        except Exception as e:
+            print("spcx news fail", e)
+            continue
+        for rank, it in enumerate(root.iter("item")):
+            title = (it.findtext("title") or "").strip()
+            src = (it.findtext("source") or "").strip()
+            if src and title.endswith(" - " + src):
+                title = title[: -len(" - " + src)]
+            key = title[:18].lower()
+            if not title or key in seen:
+                continue
+            seen.add(key)
+            try:
+                at = int(parsedate_to_datetime(it.findtext("pubDate")).timestamp())
+            except Exception:
+                at = 0
+            rows.append({"at": at, "t": title, "src": src, "l": it.findtext("link") or "", "rank": rank})
+    issues = sorted(rows, key=lambda r: r["rank"])[:10]
+    latest = sorted(rows, key=lambda r: -r["at"])[:20]
+    return {"at": int(time.time()), "issues": issues, "list": latest}
+
+
+out = {"updated": int(time.time()), "lows": lows(), "news": news(), "mon": mon(), "spcx": spcx_news()}
 if not out["lows"] and not out["news"]:
     raise SystemExit("no data")
 json.dump(out, open("dash.json", "w"), ensure_ascii=False, separators=(",", ":"))

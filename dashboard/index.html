@@ -72,7 +72,7 @@
   .tw{background:var(--card);height:100%;overflow:auto}
   .it.nw{cursor:default}
   /* B-5 속보 */
-  #c-flash .cb{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:0;overflow:hidden}
+  #c-flash .cb,#c-spnews .cb{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:0;overflow:hidden}
   .pane{overflow:auto;padding:8px 12px;min-height:0}
   .pane+.pane{border-left:1px solid var(--line)}
   .pane h2{font-size:14px;margin:2px 0 8px;color:#ff6b6b}
@@ -97,7 +97,7 @@
     .c3>.cell,.c3>.stack{min-height:380px}
     .stack>.cell{min-height:380px}
     #row3 .cells{height:auto}
-    #c-flash .cb{grid-template-columns:1fr;overflow:auto}
+    #c-flash .cb,#c-spnews .cb{grid-template-columns:1fr;overflow:auto}
     .pane{overflow:visible}
   }
 </style>
@@ -150,6 +150,19 @@
       </div>
     </div>
   </section>
+  <!-- 하단 2줄 : SPCX 핫이슈 / 속보 -->
+  <section class="row" id="row4">
+    <div class="rh"><span class="rt">하단 · SPCX 핫이슈 / 속보</span><button class="xb" data-x="row">⤢</button></div>
+    <div class="cells c1">
+      <div class="cell" id="c-spnews">
+        <div class="ch"><span>SPCX 속보<small id="spAt"></small></span><button class="xb">⤢</button></div>
+        <div class="cb">
+          <div class="pane"><h2>🔥 핫 이슈 10</h2><div id="sphot"><div class="msg">불러오는 중…</div></div></div>
+          <div class="pane"><h3>⚡ 속보 20</h3><div id="spfl"><div class="msg">불러오는 중…</div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
   <footer>본 화면은 학습·참고용이며 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다. 각 칸·줄 오른쪽 ⤢ 를 누르면 크게, ⤡ 를 누르면(또는 Esc) 원래대로 돌아옵니다.</footer>
 </main>
 <script src="headbar.js"></script>
@@ -185,11 +198,11 @@ function setMs(d){ MS = Math.max(.6, Math.min(3.5, +(MS + d).toFixed(2))); try{ 
 $('c-mon').style.setProperty('--ms', MS);
 $('msm').onclick = e=>{ e.stopPropagation(); setMs(-.15); }; $('mbg').onclick = e=>{ e.stopPropagation(); setMs(.15); };
 /* ---------- B-1 시세 전광판 12칸 ---------- */
-const ORDER = ['BTC','NASDAQ','S&P','SCHG','XYZ100','SCHD','US10Y','KOSPI','USDKRW','GOLD','WTI','KIMP'];
+const ORDER = ['BTC','XYZ100','S&P','SCHG','SPCX','SCHD','US10Y','KOSPI','USDKRW','GOLD','WTI','KIMP'];
 const MON = {};                                   // 이름 -> {p, c(비율)}
 function monPrice(t,p){
   if(typeof p!=='number') return '—';
-  const d = {'BTC':0,'NASDAQ':0,'S&P':0,'KOSPI':0,'KOSPI 야간':0,'USDKRW':0,'KIMP':0,'XYZ100':0,'US10Y':3,'GOLD':1}[t];
+  const d = {'BTC':0,'NASDAQ':0,'S&P':0,'KOSPI':0,'KOSPI 야간':0,'USDKRW':0,'KIMP':0,'XYZ100':0,'SPCX':2,'US10Y':3,'GOLD':1}[t];
   const n = d==null?2:d;
   const s = (n===0?Math.floor(p):p).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});
   return t==='US10Y' ? s+'%' : s;
@@ -219,8 +232,30 @@ async function loadXyz(){
     if(p>0 && pv>0){ MON['XYZ100'] = {p:p, c:p/pv-1}; drawMon(); }
   }catch(e){}
 }
-drawMon(); loadMon(); loadXyz();
-setInterval(loadMon, 20000); setInterval(loadXyz, 5000);
+let SPX = null;                                   // SPCX 표 행 데이터
+async function loadSpcx(){
+  try{
+    const hl = b=>fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)}).then(r=>r.json());
+    const d = await hl({type:'metaAndAssetCtxs',dex:'xyz'}), i = d[0].universe.findIndex(u=>u.name==='xyz:SPCX'); if(i<0) return;
+    const c = d[1][i], p = +c.markPx, pv = +c.prevDayPx;
+    if(!(p>0)) return;
+    if(pv>0) MON['SPCX'] = {p:p, c:p/pv-1}; else MON['SPCX'] = {p:p, c:null};
+    const now = Date.now();
+    let day = [], m5 = [];
+    try{ day = await hl({type:'candleSnapshot',req:{coin:'xyz:SPCX',interval:'1d',startTime:now-370*864e5,endTime:now}}); }catch(e){}
+    try{ m5 = await hl({type:'candleSnapshot',req:{coin:'xyz:SPCX',interval:'5m',startTime:now-80*60000,endTime:now}}); }catch(e){}
+    const cl = day.map(k=>+k.c).concat([p]);
+    const ago = n=>{ const t = now-n*864e5; let r=null; day.forEach(k=>{ if(k.t<=t) r=+k.c; }); return r; };
+    let h1 = null; m5.forEach(k=>{ if(k.t<=now-3600000) h1=+k.c; });
+    const ch = (b)=>b>0 ? p/b-1 : null;
+    const hi = Math.max(p, ...day.map(k=>+k.c)), lo = Math.min(p, ...day.map(k=>+k.c));
+    SPX = {p:p, d1:pv>0?p/pv-1:null, h1:ch(h1), w1:ch(ago(7)), m1:ch(ago(30)), hi:ch(hi), spark:cl.slice(-30), lo:lo};
+    LOWS['HL:SPCX'] = lo;
+    drawMon(); drawTable();
+  }catch(e){}
+}
+drawMon(); loadMon(); loadXyz(); loadSpcx();
+setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 15000);
 
 /* ---------- B-3 뉴스 (미증시 5 · 한국증시 5 · 코인 3) ---------- */
 const CATC = {'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
@@ -254,12 +289,26 @@ function newsFromSheet(){            // dash.json 이 없을 때: 시트의 뉴�
   }
   return out;
 }
+function drawSp(d){
+  if(!d) return;
+  const lk = x=>'<a target="_blank" rel="noopener" href="'+esc(x.l)+'">'+esc(x.t)+'</a>';
+  $('sphot').innerHTML = (d.issues||[]).slice(0,10).map((x,i)=>'<div class="issue"><span class="n">'+(i+1)+'</span>'+lk(x)+'</div>').join('') || '<div class="msg">핫 이슈 없음</div>';
+  let last = '';
+  $('spfl').innerHTML = (d.list||[]).slice(0,20).map(x=>{
+    const k = KST(x.at*1000), day = p2(k.getUTCMonth()+1)+'-'+p2(k.getUTCDate()), tm = p2(k.getUTCHours())+':'+p2(k.getUTCMinutes());
+    let h = ''; if(day!==last){ h += '<div style="font-size:12px;color:var(--sub);font-weight:700;padding:6px 0 2px">'+day+'</div>'; last = day; }
+    return h + '<div class="it"><div class="row2"><span class="tm">'+tm+'</span><span class="chip">SPCX</span><a class="ttl" style="color:var(--tx);text-decoration:none" href="'+esc(x.l)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></div>'+
+      (x.src?'<div style="margin:2px 0 0 46px;font-size:11px;color:var(--sub)">'+esc(x.src)+'</div>':'')+'</div>';
+  }).join('') || '<div class="msg">속보 없음</div>';
+  if(d.at){ const k = KST(d.at*1000); $('spAt').textContent = ' 갱신 '+p2(k.getUTCMonth()+1)+'-'+p2(k.getUTCDate())+' '+p2(k.getUTCHours())+':'+p2(k.getUTCMinutes()); }
+}
 async function loadDash(){
   try{
     const r = await fetch(DASH_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json(); LOWS = j.lows||{};
     const order = ['미증시','한국증시','코인'];
+    drawSp(j.spcx);
     NEWS = (j.news||[]).slice().sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat) || b.at-a.at);
     if(!NEWS.length) NEWS = null;
   }catch(e){ NEWS = null; }
@@ -290,13 +339,22 @@ function drawTable(){
   const body = [];
   for(let i=hi+1;i<s.rows.length;i++){ const r=s.rows[i]; if(!(r[0].t||'').trim()) break; body.push(r); }
   const hdr = s.rows[hi];
+  if(SPX){
+    const pc = v=>({t:(typeof v==='number'&&isFinite(v)) ? (v>=0?'+':'-')+Math.abs(v*100).toFixed(2)+'%' : '—'});
+    const si = body.findIndex(r=>(r[0].t||'').trim()==='S&P500 선물');
+    const ref = body[si>=0?si:0] || [];
+    const sp = ref[7] || {};
+    const row = [{t:'SPCX (24h)'},{t:SPX.p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},pc(SPX.d1),pc(SPX.h1),pc(SPX.w1),pc(SPX.m1),pc(SPX.hi),
+      {t:'',s:SPX.spark,sc:SPX.d1>=0?'#d6334a':'#2563eb',sh:sp.sh},{t:'HL:SPCX'},{t:'정상'}];
+    body.splice(si>=0?si+1:body.length,0,row);
+  }
   const colW = s.cols.map(c=>Math.max(36,c.w));
   const th = (cl,w)=>'<th style="min-width:'+w+'px">'+esc((cl.t||'').trim())+'</th>';
   let h = '<thead><tr>';
   hdr.forEach((cl,c)=>{ h += th(cl,colW[c]); if(c===NEWC) h += th({t:'52주 최저 대비'},120); });
   h += '</tr></thead><tbody>';
   body.forEach(r=>{
-    const code = (r[8].t||'').trim(), cur = parseFloat(String(r[1].t||'').replace(/,/g,'')), low = LOWS[code];
+    const code = (r[8].t||'').trim(), cur = parseFloat(String(r[1].t||'').replace(/,/g,'')), low = LOWS[code] || (code==='HL:SPCX' && SPX ? SPX.lo : 0);
     h += '<tr>';
     r.forEach((cell,c)=>{
       const t = (cell.t||'').trim();
