@@ -1,4 +1,4 @@
-"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(Save 4·미증시 3·한국증시 3·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
+"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(미증시 5·한국증시 5·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
 import datetime
 import json
 import time
@@ -41,8 +41,8 @@ def lows():
 
 
 NEWS = [  # (분류, 검색어, 개수)
-    ("미증시", "(뉴욕증시 OR 나스닥 OR 미국증시) -비트코인 -코인 -이더리움 -가상자산", 3),
-    ("한국증시", "코스피 OR 코스닥", 3),
+    ("미증시", "(뉴욕증시 OR 나스닥 OR 미국증시) -비트코인 -코인 -이더리움 -가상자산", 5),
+    ("한국증시", "코스피 OR 코스닥", 5),
     ("코인", "비트코인 OR 가상자산", 3),
 ]
 
@@ -70,7 +70,7 @@ def save_news(n=4):
 
 
 def news():
-    items = save_news(4)
+    items = []
     for cat, q, n in NEWS:
         u = "https://news.google.com/rss/search?" + urllib.parse.urlencode(
             {"q": q + " when:1d", "hl": "ko", "gl": "KR", "ceid": "KR:ko"})
