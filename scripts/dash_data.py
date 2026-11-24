@@ -96,6 +96,21 @@ def mon():
     return res
 
 
+def ko(text):
+    """영어 제목을 한글로 번역 (한글이 이미 있으면 그대로, 실패하면 원문)."""
+    if not text or any("\uac00" <= ch <= "\ud7a3" for ch in text):
+        return text
+    try:
+        u = "https://translate.googleapis.com/translate_a/single?" + urllib.parse.urlencode(
+            {"client": "gtx", "sl": "auto", "tl": "ko", "dt": "t", "q": text})
+        j = json.load(urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=20))
+        out = "".join(seg[0] for seg in j[0] if seg and seg[0])
+        return out.strip() or text
+    except Exception as e:
+        print("translate fail", e)
+        return text
+
+
 def spcx_news():
     """SPCX(SpaceX) 관련 뉴스만: 핫이슈 10(관련도순) + 속보 20(최신순)."""
     rows, seen = [], set()
@@ -122,6 +137,12 @@ def spcx_news():
             rows.append({"at": at, "t": title, "src": src, "l": it.findtext("link") or "", "rank": rank})
     issues = sorted(rows, key=lambda r: r["rank"])[:10]
     latest = sorted(rows, key=lambda r: -r["at"])[:20]
+    cache = {}
+    for r in issues + latest:   # 같은 기사는 한 번만 번역
+        if r["t"] not in cache:
+            cache[r["t"]] = ko(r["t"])
+        r["o"] = r["t"]
+        r["t"] = cache[r["t"]]
     return {"at": int(time.time()), "issues": issues, "list": latest}
 
 

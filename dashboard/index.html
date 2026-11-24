@@ -291,13 +291,13 @@ function newsFromSheet(){            // dash.json 이 없을 때: 시트의 뉴�
 }
 function drawSp(d){
   if(!d) return;
-  const lk = x=>'<a target="_blank" rel="noopener" href="'+esc(x.l)+'">'+esc(x.t)+'</a>';
+  const lk = x=>'<a target="_blank" rel="noopener" title="'+esc(x.o||'')+'" href="'+esc(x.l)+'">'+esc(x.t)+'</a>';
   $('sphot').innerHTML = (d.issues||[]).slice(0,10).map((x,i)=>'<div class="issue"><span class="n">'+(i+1)+'</span>'+lk(x)+'</div>').join('') || '<div class="msg">핫 이슈 없음</div>';
   let last = '';
   $('spfl').innerHTML = (d.list||[]).slice(0,20).map(x=>{
     const k = KST(x.at*1000), day = p2(k.getUTCMonth()+1)+'-'+p2(k.getUTCDate()), tm = p2(k.getUTCHours())+':'+p2(k.getUTCMinutes());
     let h = ''; if(day!==last){ h += '<div style="font-size:12px;color:var(--sub);font-weight:700;padding:6px 0 2px">'+day+'</div>'; last = day; }
-    return h + '<div class="it"><div class="row2"><span class="tm">'+tm+'</span><span class="chip">SPCX</span><a class="ttl" style="color:var(--tx);text-decoration:none" href="'+esc(x.l)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></div>'+
+    return h + '<div class="it"><div class="row2"><span class="tm">'+tm+'</span><span class="chip">SPCX</span><a class="ttl" style="color:var(--tx);text-decoration:none" title="'+esc(x.o||'')+'" href="'+esc(x.l)+'" target="_blank" rel="noopener">'+esc(x.t)+'</a></div>'+
       (x.src?'<div style="margin:2px 0 0 46px;font-size:11px;color:var(--sub)">'+esc(x.src)+'</div>':'')+'</div>';
   }).join('') || '<div class="msg">속보 없음</div>';
   if(d.at){ const k = KST(d.at*1000); $('spAt').textContent = ' 갱신 '+p2(k.getUTCMonth()+1)+'-'+p2(k.getUTCDate())+' '+p2(k.getUTCHours())+':'+p2(k.getUTCMinutes()); }

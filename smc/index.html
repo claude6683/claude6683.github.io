@@ -128,7 +128,7 @@ const chart = LightweightCharts.createChart($('chart'), {
   crosshair:{mode:0, horzLine:{labelVisible:false}},
   handleScale:{mouseWheel:true, pinch:true, axisPressedMouseMove:true},
   handleScroll:{pressedMouseMove:true, mouseWheel:false, horzTouchDrag:true, vertTouchDrag:false},
-  localization:{priceFormatter:axisFmt, timeFormatter:t=>{ if(typeof t!=='number') return ''; const d=new Date(t*1000), p=n=>String(n).padStart(2,'0'); return "'"+String(d.getUTCFullYear()).slice(2)+' '+(d.getUTCMonth()+1)+' '+d.getUTCDate()+(cfg.intraday?' '+p(d.getUTCHours()):''); }},
+  localization:{priceFormatter:axisFmt, timeFormatter:t=>{ if(typeof t!=='number') return ''; const d=new Date(t*1000), p=n=>String(n).padStart(2,'0'); return "'"+String(d.getUTCFullYear()).slice(2)+' '+(d.getUTCMonth()+1)+' '+d.getUTCDate()+(cfg.intraday?' H'+p(d.getUTCHours()):''); }},
 });
 const ts = chart.timeScale();
 const cs = chart.addCandlestickSeries({
