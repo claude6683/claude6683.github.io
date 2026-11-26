@@ -383,7 +383,7 @@ function route(){
     loadChart(false);
   }else{
     document.body.classList.remove('chart'); curId = null;
-    if(matchMedia('(min-width:900px)').matches){ location.replace('#'+SYMS[0].id); }
+    if(matchMedia('(min-width:900px)').matches){ history.replaceState(null,'','#'+SYMS[0].id); route(); }
   }
 }
 function buildUI(){
