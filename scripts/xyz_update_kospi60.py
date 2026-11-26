@@ -29,7 +29,7 @@ for h in HOSTS:
     try:
         j = fetch(h)
         if ok(j):
-            os.makedirs("data", exist_ok=True)
+            os.makedirs("xyz-data", exist_ok=True)
             with open(OUT, "w") as f:
                 json.dump(j, f)
             print("saved from", h)

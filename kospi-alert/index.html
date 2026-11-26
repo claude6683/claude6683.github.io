@@ -460,7 +460,7 @@ function tToI(t){var n=bars.length;if(!n)return 0;if(t>=bars[n-1].t)return n-1+(
 function iToT(i){var n=bars.length;if(!n)return 0;if(i<=0)return bars[0].t+i*STEP[tf];if(i>=n-1)return bars[n-1].t+(i-n+1)*STEP[tf];
   var lo=Math.floor(i),f=i-lo;return bars[lo].t+f*(bars[lo+1].t-bars[lo].t);}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(drawings));}catch(e){}}
-try{var a0=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(a0))drawings=a0;}catch(e){}
+try{var a0=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(a0))drawings=a0.filter(function(d){return d&&typeof d.k==='string';});}catch(e){}
 function setBars(a,label){
   daily=a;manual=false;meas=null;build();layout();refresh();resetView();hideMsg();draw();
   var l=$('live');l.className='';l.textContent=label;

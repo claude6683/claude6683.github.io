@@ -452,7 +452,7 @@
   function loadDraw(){
     try{
       var a=JSON.parse(localStorage.getItem(STORE_KEY)||'[]');
-      return Array.isArray(a)?a:[];
+      return Array.isArray(a)?a.filter(function(d){return d&&typeof d.k==='string';}):[];
     }catch(e){ return []; }
   }
   function save(){ try{localStorage.setItem(STORE_KEY,JSON.stringify(drawings));}catch(e){} }

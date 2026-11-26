@@ -29,5 +29,8 @@ jobs:
           git add divergence/index.html
           git diff --cached --quiet && exit 0
           git commit -m "update divergence chart"
-          git pull --rebase origin main
-          git push
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            sleep 5
+          done
+          exit 1

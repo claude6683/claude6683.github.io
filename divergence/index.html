@@ -373,7 +373,7 @@ function updateInfo(i){
 function pos(e){ const r = cv.getBoundingClientRect(); return {x: e.clientX - r.left, y: e.clientY - r.top}; }
 function nearDiv(p){ return Math.abs(p.y - H1) <= 5 && p.x < W; }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(drawings)); }catch(e){} }
-try{ const a0 = JSON.parse(localStorage.getItem(KEY) || "[]"); if(Array.isArray(a0)) drawings = a0; }catch(e){}
+try{ const a0 = JSON.parse(localStorage.getItem(KEY) || "[]"); if(Array.isArray(a0)) drawings = a0.filter(function(d){ return d&&typeof d.k==='string'; }); }catch(e){}
 
 cv.addEventListener("pointerdown", function(e){
   const p = pos(e);
