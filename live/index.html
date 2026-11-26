@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Live Show</title>
+<style>
+  :root{--bg:#0f1115;--card:#161a21;--line:#262c37;--tx:#e8eaf0;--sub:#8b93a7;--up:#ef4444;--dn:#3b82f6;--ac:#f2b84b}
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;-webkit-text-size-adjust:100%}
+  #app{display:flex;height:100%;overflow:hidden}
+  button{font:inherit;color:inherit;background:#1d2330;border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
+  button:hover{border-color:#5b6b8c}
+  button.on{background:var(--ac);border-color:var(--ac);color:#111;font-weight:700}
+  .up{color:var(--up)} .dn{color:var(--dn)}
+
+  /* 목록 */
+  #listView{width:100%;display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0}
+  #listView header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);flex:none}
+  h1{font-size:18px;margin:0}
+  #conn{margin-left:auto;font-size:12px;color:var(--sub);white-space:nowrap}
+  #conn i{font-style:normal}
+  .cols,.row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,.9fr) 46px;gap:8px;align-items:center;padding:0 14px}
+  .cols{height:28px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--line);flex:none}
+  .cols span:nth-child(n+2),.row span:nth-child(n+2){text-align:right}
+  #rows{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
+  .row{height:44px;border-bottom:1px solid #1a1f29;cursor:pointer;font-variant-numeric:tabular-nums}
+  .row:hover{background:#171c25}
+  .row.sel{background:#1c2230}
+  .row .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .row .tm{font-size:12px;color:var(--sub)}
+  .row .pr.flash{background:rgba(242,184,75,.18)}
+  .row .pr{border-radius:4px;transition:background .6s}
+
+  /* 차트 */
+  #chartView{display:none;flex-direction:column;min-width:0;flex:1}
+  .cbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
+  .cbar .tt{font-weight:700;font-size:16px}
+  .cbar .cp{font-variant-numeric:tabular-nums;font-size:16px}
+  .cbar .sp{flex:1}
+  .grp{display:flex;gap:4px}
+  #cwrap{position:relative;flex:1;min-height:0}
+  #chart{position:absolute;inset:0}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(22,26,33,.95);border:1px solid #3a4254;border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #cmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--sub);font-size:14px;pointer-events:none}
+  #cnote{flex:none;padding:6px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--sub)}
+  #back{display:none}
+
+  /* 모바일: 목록 → 차트 전환 */
+  body.chart #listView{display:none}
+  body.chart #chartView{display:flex}
+  body.chart #back{display:inline-block}
+  /* 넓은 화면: 목록 + 차트 나란히 */
+  @media(min-width:900px){
+    #listView{width:380px;flex:none}
+    #chartView{display:flex}
+    body.chart #listView{display:flex}
+    #back{display:none!important}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <section id="listView">
+    <header><h1>Live Show</h1><span id="conn"></span></header>
+    <div class="cols"><span>심볼</span><span>현재가</span><span>변동%</span><span>갱신</span></div>
+    <div id="rows"></div>
+  </section>
+  <section id="chartView">
+    <div class="cbar">
+      <button id="back">‹ 목록</button>
+      <span class="tt" id="ctitle">—</span>
+      <span class="cp" id="cprice"></span>
+      <span class="sp"></span>
+      <div class="grp" id="tfs"></div>
+      <div class="grp">
+        <button data-m="pct" class="on">%</button><button data-m="price">가격</button>
+        <button id="reset">초기화</button>
+      </div>
+    </div>
+    <div id="cwrap"><div id="chart"></div><div id="tip"></div><div id="cmsg"></div></div>
+    <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 더블클릭 초기화 · 상승 빨강 / 하락 파랑</div>
+  </section>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+// 야후 시세 중계 Worker 주소 (배포 후 여기에 넣음). 비어 있으면 공개 CORS 프록시로 대체 (느리고 불안정할 수 있음)
+window.LIVE_WORKER = window.LIVE_WORKER || '';
+</script>
+<script>
+(function(){
+'use strict';
+const KST = 32400;                       // 초
+const WORKER = (window.LIVE_WORKER||'').replace(/\/$/,'');
+const YAHOO_POLL_MS = 15000;
+
+// ---- 종목 (src: bn=바이낸스, up=업비트, hl=하이퍼리퀴드, yf=야후) ----
+const SYMS = [
+  {id:'BTCUSDT',  src:'bn', k:'BTCUSDT',  dec:2},
+  {id:'ETHUSDT',  src:'bn', k:'ETHUSDT',  dec:2},
+  {id:'BTCKRW',   src:'up', k:'KRW-BTC',  dec:0},
+  {id:'ETHKRW',   src:'up', k:'KRW-ETH',  dec:0},
+  {id:'USDKRW',   src:'yf', k:'KRW=X',    dec:2},
+  {id:'USDTKRW',  src:'up', k:'KRW-USDT', dec:1},
+  {id:'XYZ100USD',src:'hl', k:'xyz:XYZ100',dec:2},
+  {id:'NAS100',   src:'yf', k:'NQ=F',     dec:2},
+  {id:'KOSPI',    src:'yf', k:'^KS11',    dec:2},
+  {id:'GOOGL',    src:'yf', k:'GOOGL',    dec:2},
+  {id:'BPUSDT',   src:'bn', k:'BPUSDT',   dec:4},
+  {id:'GOLD',     src:'yf', k:'GC=F',     dec:2},
+  {id:'QQQM',     src:'yf', k:'QQQM',     dec:2},
+  {id:'SCHG',     src:'yf', k:'SCHG',     dec:2},
+  {id:'SCHD',     src:'yf', k:'SCHD',     dec:2},
+  {id:'SPCX',     src:'yf', k:'SPCX',     dec:2},
+  {id:'VOO',      src:'yf', k:'VOO',      dec:2},
+  {id:'000660',   src:'yf', k:'000660.KS',dec:0},
+  {id:'005930',   src:'yf', k:'005930.KS',dec:0},
+  {id:'EWY',      src:'yf', k:'EWY',      dec:2},
+  {id:'NVDA',     src:'yf', k:'NVDA',     dec:2},
+];
+const BY = {}; SYMS.forEach(s=>BY[s.id]=s);
+const st = {};          // id -> {p, pc, t(ms)}
+const feedAt = {bn:0, up:0, hl:0, yf:0};
+const $ = id => document.getElementById(id);
+
+// ---- 공통 ----
+const fmt = (s,v)=> v==null||!isFinite(v) ? '—' : v.toLocaleString('en-US',{minimumFractionDigits:s.dec,maximumFractionDigits:s.dec});
+const hhmm = ms => ms ? new Date(ms+KST*1000).toISOString().slice(11,16) : '--:--';
+const sgn = v => (v>0?'+':'')+v.toFixed(2)+'%';
+const cls = v => v>0?'up':(v<0?'dn':'');
+function timeout(ms){ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms); return {signal:c.signal, done:()=>clearTimeout(t)}; }
+async function getJSON(url, opt){
+  const tries = [url];
+  if(WORKER) tries.push(WORKER+'/?u='+encodeURIComponent(url));
+  tries.push('https://corsproxy.io/?'+encodeURIComponent(url), 'https://api.allorigins.win/raw?url='+encodeURIComponent(url));
+  let err;
+  for(const u of tries){
+    const t = timeout(8000);
+    try{
+      const r = await fetch(u, Object.assign({signal:t.signal}, opt||{}));
+      if(!r.ok) throw new Error('http '+r.status);
+      const j = await r.json(); t.done(); return j;
+    }catch(e){ t.done(); err = e; }
+  }
+  throw err;
+}
+
+// ---- 시세 입력 ----
+let dirtyIds = new Set(), raf = 0;
+function setQuote(id, p, pc, t){
+  if(!isFinite(p)) return;
+  const o = st[id] || (st[id] = {});
+  o.p = p; if(pc!=null && isFinite(pc)) o.pc = pc; o.t = t || Date.now();
+  dirtyIds.add(id);
+  if(!raf) raf = requestAnimationFrame(flush);
+  liveTick(id, p, o.t);
+}
+function flush(){
+  raf = 0;
+  dirtyIds.forEach(updateRow); dirtyIds.clear();
+  if(curId && st[curId]) updateHead();
+}
+
+// ---- 목록 ----
+const rowEl = {};
+function buildRows(){
+  const box = $('rows');
+  SYMS.forEach(s=>{
+    const d = document.createElement('div'); d.className='row'; d.dataset.id=s.id;
+    d.innerHTML = '<span class="nm">'+s.id+'</span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
+    d.onclick = ()=>{ location.hash = '#'+s.id; };
+    box.appendChild(d); rowEl[s.id] = d;
+  });
+}
+function updateRow(id){
+  const s = BY[id], q = st[id], el = rowEl[id]; if(!q) return;
+  const pr = el.children[1], ch = el.children[2];
+  const old = pr.textContent, nw = fmt(s,q.p);
+  pr.textContent = nw;
+  if(old!==nw && old!=='—'){ pr.classList.add('flash'); setTimeout(()=>pr.classList.remove('flash'),600); }
+  if(q.pc){ const c=(q.p/q.pc-1)*100; ch.textContent = sgn(c); ch.className='ch '+cls(c); pr.className = 'pr '+cls(c); }
+  el.children[3].textContent = hhmm(q.t);
+}
+function updateConn(){
+  const now = Date.now();
+  const dot = (k,label,lim)=>'<i style="color:'+((now-feedAt[k])<lim?'#22c55e':'#6b7280')+'">●</i> '+label;
+  $('conn').innerHTML = dot('bn','바이낸스',20000)+'  '+dot('up','업비트',20000)+'  '+dot('hl','HL',60000)+'  '+dot('yf','주식',45000);
+}
+
+// ---- 실시간: 바이낸스 / 업비트 / 하이퍼리퀴드 (웹소켓, 브라우저 직결) ----
+function connect(make, name){
+  let w;
+  (function open(){
+    try{ w = make(); }catch(e){ setTimeout(open,3000); return; }
+    w.addEventListener('close', ()=>setTimeout(open,2000));
+    w.addEventListener('error', ()=>{ try{w.close();}catch(e){} });
+  })();
+}
+function wsBinance(){
+  const list = SYMS.filter(s=>s.src==='bn'); const map={}; list.forEach(s=>map[s.k]=s);
+  connect(()=>{
+    const w = new WebSocket('wss://stream.binance.com:9443/stream?streams='+list.map(s=>s.k.toLowerCase()+'@ticker').join('/'));
+    w.onmessage = e=>{ const m=JSON.parse(e.data).data; if(!m||!map[m.s]) return; feedAt.bn=Date.now(); setQuote(map[m.s].id, +m.c, +m.o, m.E); };
+    return w;
+  });
+}
+function wsUpbit(){
+  const list = SYMS.filter(s=>s.src==='up'); const map={}; list.forEach(s=>map[s.k]=s);
+  connect(()=>{
+    const w = new WebSocket('wss://api.upbit.com/websocket/v1'); w.binaryType='arraybuffer';
+    w.onopen = ()=>w.send(JSON.stringify([{ticket:'liveshow'},{type:'ticker',codes:list.map(s=>s.k),isOnlyRealtime:true}]));
+    w.onmessage = e=>{ const m=JSON.parse(new TextDecoder().decode(e.data)); const s=map[m.code]; if(!s) return;
+      feedAt.up=Date.now(); setQuote(s.id, m.trade_price, m.prev_closing_price, m.trade_timestamp); };
+    return w;
+  });
+}
+function wsHyper(){
+  const s = SYMS.find(x=>x.src==='hl'); if(!s) return;
+  const prev = async ()=>{ try{
+    const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:'1d',startTime:Date.now()-4*864e5,endTime:Date.now()}})});
+    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c; dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
+  }catch(e){} };
+  prev(); setInterval(prev, 300000);
+  connect(()=>{
+    const w = new WebSocket('wss://api.hyperliquid.xyz/ws');
+    w.onopen = ()=>w.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:s.k,interval:'1m'}}));
+    w.onmessage = e=>{ const j=JSON.parse(e.data); if(j.channel!=='candle'||!j.data) return;
+      feedAt.hl=Date.now(); setQuote(s.id, +j.data.c, null, Date.now()); liveBar(s.id, j.data); };
+    return w;
+  });
+}
+
+// ---- 주식·지수·금·환율: 야후 (15초 폴링) ----
+function parseY(j){
+  const r = j&&j.chart&&j.chart.result&&j.chart.result[0]; if(!r) return null;
+  const meta=r.meta||{}, ts=r.timestamp||[], cl=(r.indicators.quote[0]||{}).close||[];
+  let p=null,t=null; for(let i=cl.length-1;i>=0;i--){ if(cl[i]!=null){p=cl[i];t=ts[i]*1000;break;} }
+  if(p==null){ p=meta.regularMarketPrice; t=(meta.regularMarketTime||0)*1000; }
+  if(p==null) return null;
+  return {p, pc: meta.chartPreviousClose!=null?meta.chartPreviousClose:meta.previousClose, t};
+}
+let ypoll = false;
+async function pollYahoo(){
+  if(ypoll) return; ypoll = true;
+  const list = SYMS.filter(s=>s.src==='yf');
+  try{
+    if(WORKER){
+      const j = await getJSON(WORKER+'/?q='+list.map(s=>encodeURIComponent(s.k)).join(','));
+      list.forEach(s=>{ const v=j[s.k]; if(v){ setQuote(s.id, v.p, v.pc, v.t); } });
+      feedAt.yf = Date.now();
+    }else{
+      // 대체 경로: 종목별 개별 요청 (공개 프록시 → 느림)
+      await Promise.all(list.map(async s=>{
+        try{
+          const j = await getJSON('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(s.k)+'?range=1d&interval=1m&includePrePost=true');
+          const v = parseY(j); if(v){ setQuote(s.id, v.p, v.pc, v.t); feedAt.yf = Date.now(); }
+        }catch(e){}
+      }));
+    }
+  }catch(e){}
+  ypoll = false;
+}
+
+// ---- 차트 ----
+const TFS = [['m1','1분'],['m5','5분'],['h1','1시간'],['d1','일']];
+let curId = null, tf = 'm5', mode = 'pct', chart = null, series = null, zeroLine = null;
+let bars = [], base = 1, byTime = new Map(), loadSeq = 0, reloadT = 0;
+const STEP = {m1:60, m5:300, h1:3600, d1:86400};
+
+function initChart(){
+  chart = LightweightCharts.createChart($('chart'),{
+    layout:{background:{color:'#0f1115'},textColor:'#8b93a7'},
+    grid:{vertLines:{color:'#1b1f27'},horzLines:{color:'#1b1f27'}},
+    rightPriceScale:{borderColor:'#2a2f3a',minimumWidth:72},
+    timeScale:{borderColor:'#2a2f3a',timeVisible:true,secondsVisible:false,rightOffset:6},
+    crosshair:{mode:0},
+    handleScroll:{mouseWheel:false,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
+    handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true},
+    localization:{priceFormatter:v=> mode==='pct' ? (v>0?'+':'')+v.toFixed(2)+'%' : yfmt(v)},
+  });
+  series = chart.addCandlestickSeries({
+    upColor:'#ef4444',downColor:'#3b82f6',borderVisible:false,wickUpColor:'#ef4444',wickDownColor:'#3b82f6',
+    priceLineVisible:true,lastValueVisible:true,
+  });
+  new ResizeObserver(()=>chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight})).observe($('chart'));
+  chart.subscribeCrosshairMove(onCross);
+  $('chart').addEventListener('dblclick', resetView);
+}
+function yfmt(v){ const s=BY[curId]||{dec:2}; const d = Math.abs(v)>=1000?Math.min(s.dec,2):s.dec; return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+const tv = v => mode==='pct' ? (v/base-1)*100 : v;
+function toPt(b){ return {time:b.time+KST, open:tv(b.o), high:tv(b.h), low:tv(b.l), close:tv(b.c)}; }
+function render(){
+  if(!series) return;
+  series.setData(bars.map(toPt));
+  if(zeroLine){ series.removePriceLine(zeroLine); zeroLine=null; }
+  zeroLine = series.createPriceLine({price: mode==='pct'?0:base, color:'#6b7280', lineWidth:1, lineStyle:2, axisLabelVisible:true, title: mode==='pct'?'0%':'종가'});
+}
+function resetView(){
+  const n = bars.length; if(!n) return;
+  chart.priceScale('right').applyOptions({autoScale:true});
+  chart.timeScale().setVisibleLogicalRange({from:Math.max(0,n-120), to:n+6});
+}
+async function fetchBars(s, tfk){
+  const iv = {m1:'1m',m5:'5m',h1:'1h',d1:'1d'}[tfk];
+  if(s.src==='bn'){
+    const j = await getJSON('https://api.binance.com/api/v3/klines?symbol='+s.k+'&interval='+iv+'&limit=500');
+    return j.map(x=>({time:Math.floor(x[0]/1000),o:+x[1],h:+x[2],l:+x[3],c:+x[4]}));
+  }
+  if(s.src==='up'){
+    const u = {m1:'minutes/1',m5:'minutes/5',h1:'minutes/60',d1:'days'}[tfk];
+    const j = await getJSON('https://api.upbit.com/v1/candles/'+u+'?market='+s.k+'&count=200');
+    return j.map(x=>({time:Math.floor(Date.parse(x.candle_date_time_utc+'Z')/1000),o:x.opening_price,h:x.high_price,l:x.low_price,c:x.trade_price})).reverse();
+  }
+  if(s.src==='hl'){
+    const now = Date.now();
+    const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:iv,startTime:now-500*STEP[tfk]*1000,endTime:now}})});
+    return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o,h:+x.h,l:+x.l,c:+x.c}));
+  }
+  const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
+  const j = await getJSON('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(s.k)+'?range='+rg[0]+'&interval='+rg[1]+'&includePrePost=true');
+  const r = j.chart.result[0], q = r.indicators.quote[0], out = [];
+  (r.timestamp||[]).forEach((t,i)=>{ if(q.close[i]!=null && q.open[i]!=null) out.push({time:t,o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i]}); });
+  return out;
+}
+async function loadChart(keepView){
+  if(!curId) return; const s = BY[curId], my = ++loadSeq;
+  $('cmsg').textContent = '불러오는 중…';
+  try{
+    const b = await fetchBars(s, tf);
+    if(my!==loadSeq) return;
+    if(!b.length) throw new Error('empty');
+    bars = b; base = bars[bars.length-1].c;
+    byTime = new Map(bars.map(x=>[x.time+KST,x]));
+    $('cmsg').textContent = '';
+    render(); if(!keepView) resetView();
+  }catch(e){ if(my===loadSeq){ bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
+}
+// 실시간 틱 → 마지막 봉 갱신
+function liveTick(id, p, tms){
+  if(id!==curId || !bars.length) return;
+  const step = STEP[tf], last = bars[bars.length-1];
+  const bt = Math.floor(tms/1000/step)*step;
+  if(bt > last.time && tf!=='d1'){
+    const nb = {time:bt,o:last.c,h:Math.max(last.c,p),l:Math.min(last.c,p),c:p}; bars.push(nb); byTime.set(nb.time+KST,nb);
+  }else{
+    last.c = p; if(p>last.h) last.h=p; if(p<last.l) last.l=p;
+  }
+  const b = bars[bars.length-1]; series.update(toPt(b));
+}
+function liveBar(id, d){ /* 하이퍼리퀴드 1분봉 수신은 liveTick 이 처리 */ }
+function onCross(p){
+  const tip = $('tip');
+  if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ tip.style.display='none'; return; }
+  const b = byTime.get(p.time); if(!b){ tip.style.display='none'; return; }
+  const s = BY[curId], c = (b.c/base-1)*100;
+  const d = new Date(p.time*1000).toISOString();
+  const day = tf==='d1';
+  tip.innerHTML = '<div>'+d.slice(0,10)+(day?'':' '+d.slice(11,16))+'</div>'
+    + '<div>가격 <b>'+fmt(s,b.c)+'</b></div>'
+    + '<div>종가 대비 <b class="'+cls(c)+'">'+sgn(c)+'</b></div>';
+  tip.style.display='block';
+  const w = $('cwrap').clientWidth, tw = tip.offsetWidth;
+  tip.style.left = Math.min(Math.max(4,p.point.x+14), w-tw-80)+'px';
+  tip.style.top = Math.max(4,p.point.y-60)+'px';
+}
+function updateHead(){
+  const s = BY[curId], q = st[curId]; if(!q) return;
+  const c = q.pc ? (q.p/q.pc-1)*100 : null;
+  $('cprice').innerHTML = fmt(s,q.p)+(c==null?'':' <span class="'+cls(c)+'">'+sgn(c)+'</span>')+' <span style="font-size:12px;color:var(--sub)">'+hhmm(q.t)+'</span>';
+}
+
+// ---- 화면 전환 ----
+function route(){
+  const id = decodeURIComponent(location.hash.slice(1));
+  Object.values(rowEl).forEach(e=>e.classList.remove('sel'));
+  if(id && BY[id]){
+    curId = id; rowEl[id].classList.add('sel'); document.body.classList.add('chart');
+    $('ctitle').textContent = id; updateHead();
+    if(!chart) initChart();
+    loadChart(false);
+  }else{
+    document.body.classList.remove('chart'); curId = null;
+    if(matchMedia('(min-width:900px)').matches){ location.replace('#'+SYMS[0].id); }
+  }
+}
+function buildUI(){
+  buildRows();
+  const g = $('tfs');
+  TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
+    b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); loadChart(false); }; g.appendChild(b); });
+  document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ mode=b.dataset.m;
+    document.querySelectorAll('[data-m]').forEach(x=>x.classList.toggle('on',x===b)); render(); });
+  $('reset').onclick = ()=>{ loadChart(false); };
+  $('back').onclick = ()=>{ location.hash = ''; };
+  window.addEventListener('hashchange', route);
+}
+
+buildUI();
+wsBinance(); wsUpbit(); wsHyper();
+pollYahoo(); setInterval(pollYahoo, YAHOO_POLL_MS);
+setInterval(updateConn, 1000); updateConn();
+setInterval(()=>{ if(curId) loadChart(true); }, 300000);   // 5분마다 봉 전체 새로고침(기준 종가 재설정)
+route();
+})();
+</script>
+</body>
+</html>
