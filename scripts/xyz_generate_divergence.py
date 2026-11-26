@@ -113,6 +113,8 @@ TEMPLATE = r'''<!DOCTYPE html>
     <button data-tool="l">&#52628;&#49464;&#49440;</button>
     <button data-tool="r">&#49324;&#44033;&#54805;</button>
     <button data-tool="m">&#51116;&#44592;</button>
+    <button data-tool="f">&#54588;&#48372;&#45208;&#52824;</button>
+    <button data-tool="e">&#51648;&#50864;&#44060;</button>
     <span class="bar"></span>
     <button id="undo">&#47560;&#51648;&#47561; &#51648;&#50864;&#44592;</button>
     <button id="clear">&#51204;&#52404; &#51648;&#50864;&#44592;</button>
@@ -228,6 +230,22 @@ function plotSeries(arr, col, w, yf, a, z){
   }
   ctx.stroke();
 }
+const FIB = [0,0.236,0.382,0.5,0.618,0.786,1];
+function segD(p,ax,ay,bx,by){ const dx=bx-ax, dy=by-ay, l=dx*dx+dy*dy; let t=l?((p.x-ax)*dx+(p.y-ay)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(p.x-(ax+t*dx),p.y-(ay+t*dy)); }
+function hitD(d,p){
+  if(d.k==="h") return Math.abs(yOf(d.p)-p.y);
+  if(d.k==="v") return Math.abs(px(d.t)-p.x);
+  const x1=px(d.t1), y1=yOf(d.p1), x2=px(d.t2), y2=yOf(d.p2);
+  if(d.k==="l") return segD(p,x1,y1,x2,y2);
+  if(d.k==="r"){ const l=Math.min(x1,x2), r=Math.max(x1,x2), t=Math.min(y1,y2), b=Math.max(y1,y2);
+    if(p.x>=l&&p.x<=r&&p.y>=t&&p.y<=b) return 0;
+    return Math.hypot(Math.max(l-p.x,0,p.x-r), Math.max(t-p.y,0,p.y-b)); }
+  if(d.k==="f"){ let m=segD(p,x1,y1,x2,y2); const xl=Math.min(x1,x2);
+    if(p.x>=xl-6) FIB.forEach(function(q){ m=Math.min(m,Math.abs(yOf(d.p2+(d.p1-d.p2)*q)-p.y)); });
+    return m; }
+  return 1e9;
+}
+function eraseAt(p){ let bi=-1, bd=12; drawings.forEach(function(d,i){ const v=hitD(d,p); if(v<=bd){ bd=v; bi=i; } }); if(bi>=0){ drawings.splice(bi,1); save(); } draw(); }
 function drawShape(d, isDraft){
   ctx.strokeStyle = GOLD; ctx.lineWidth = 1.5; ctx.setLineDash(isDraft ? [5,4] : []);
   if(d.k === "h"){
@@ -238,6 +256,16 @@ function drawShape(d, isDraft){
     ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H1); ctx.stroke();
   } else if(d.k === "l"){
     ctx.beginPath(); ctx.moveTo(px(d.t1), yOf(d.p1)); ctx.lineTo(px(d.t2), yOf(d.p2)); ctx.stroke();
+  } else if(d.k === "f"){
+    const xa = px(d.t1), xb = px(d.t2), xl = Math.min(xa, xb);
+    ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(xa, yOf(d.p1)); ctx.lineTo(xb, yOf(d.p2)); ctx.stroke(); ctx.setLineDash([]);
+    FIB.forEach(function(r){
+      const pr = d.p2 + (d.p1 - d.p2) * r, yy = Math.round(yOf(pr)) + 0.5;
+      ctx.strokeStyle = (r === 0 || r === 1) ? GOLD : "rgba(242,184,75,0.6)";
+      ctx.beginPath(); ctx.moveTo(xl, yy); ctx.lineTo(pw, yy); ctx.stroke();
+      ctx.fillStyle = GOLD; ctx.font = "11px sans-serif"; ctx.textAlign = "left"; ctx.fillText(r + " (" + fp(pr) + ")", Math.max(2, xl + 4), yy - 3);
+    });
+    ctx.strokeStyle = GOLD;
   } else if(d.k === "r"){
     const x1 = px(d.t1), y1 = yOf(d.p1), x2 = px(d.t2), y2 = yOf(d.p2);
     ctx.fillStyle = "rgba(242,184,75,0.12)";
@@ -416,6 +444,7 @@ cv.addEventListener("pointerdown", function(e){
   const inTop = p.y < H1 && p.x < pw;
   if(tool === "none" || !inTop){ pan = {x: p.x, y: p.y, left: left, min: mMin, max: mMax, top: p.y < H1}; return; }
   if(tool === "h"){ drawings.push({k: "h", p: pOf(p.y)}); save(); draw(); }
+  else if(tool === "e"){ eraseAt(p); }
   else if(tool === "v"){ drawings.push({k: "v", t: iToT(Math.round(iOf(p.x)))}); save(); draw(); }
   else if(tool === "m"){ const tm = iToT(Math.round(iOf(p.x))), pm = pOf(p.y); meas = {t1: tm, p1: pm, t2: tm, p2: pm, live: true}; }
   else { const t0 = iToT(iOf(p.x)), p0 = pOf(p.y); draft = {k: tool, t1: t0, p1: p0, t2: t0, p2: p0}; }

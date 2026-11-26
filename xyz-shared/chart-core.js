@@ -73,7 +73,9 @@
     '<div class="toolbar">'+
       '<label>봉 <select id="tf">'+(YAHOO?'':'<option value="1h">1시간</option><option value="4h">4시간</option>')+'<option value="1d" selected>1일</option><option value="1w">1주</option></select></label>'+
       '<span class="bar"></span>'+
-      '<button data-tool="none" class="on">이동</button><button data-tool="h">수평선</button><button data-tool="v">수직선</button><button data-tool="l">추세선</button><button data-tool="r">사각형</button><button data-tool="m">재기</button>'+
+      '<button data-tool="none" class="on">이동</button><button data-tool="h">수평선</button><button data-tool="v">수직선</button><button data-tool="l">추세선</button><button data-tool="r">사각형</button><button data-tool="m">재기</button><button data-tool="f">피보나치</button><button data-tool="e">지우개</button>'+
+      '<span class="bar"></span>'+
+      '<button id="mP">가격</button><button id="mPct" class="on">%</button>'+
       '<span class="bar"></span>'+
       '<button id="undo">마지막 지우기</button><button id="clear">전체 지우기</button>'+
       '<span class="sp"></span>'+
@@ -126,6 +128,10 @@
     return isIntra()?s.slice(0,10)+' '+s.slice(11,16):s.slice(0,10);
   }
   function fmtP(p){return p>=1000?p.toFixed(1):p.toFixed(2);}
+  var mode='pct';
+  function base(){return bars.length?bars[bars.length-1].c:1;}
+  function fmtPct(p){var b=base(),v=(p-b)/b*100;return (v>0?'+':'')+v.toFixed(2)+'%';}
+  function fmtY(p){return mode==='pct'?fmtPct(p):fmtP(p);}
   function showMsg(t){msg.style.display='flex';msg.textContent=t;}
   function hideMsg(){msg.style.display='none';}
 
@@ -511,12 +517,14 @@
     ctx.save();
     ctx.beginPath(); ctx.rect(0,0,pw,ph); ctx.clip();
 
-    var step=niceStep(yMax-yMin,7);
+    var ticks=makeTicks();
     ctx.strokeStyle='#222b39'; ctx.lineWidth=1;
-    for(var p=Math.ceil(yMin/step)*step; p<yMax; p+=step){
-      var y=Math.round(yOf(p))+0.5;
+    ticks.forEach(function(tk){
+      var y=Math.round(yOf(tk.p))+0.5;
       ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(pw,y); ctx.stroke();
-    }
+    });
+    var y0=Math.round(yOf(base()))+0.5;
+    if(y0>0&&y0<ph){ ctx.setLineDash([5,4]); ctx.strokeStyle='#5b6b82'; ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(pw,y0); ctx.stroke(); ctx.setLineDash([]); }
 
     var bw=Math.max(1,Math.floor(barW*0.7));
     for(i=a;i<=z;i++){
@@ -555,14 +563,12 @@
     ctx.fillStyle='#171d27'; ctx.fillRect(pw,0,AX,H);
     ctx.strokeStyle='#2a3342'; ctx.beginPath(); ctx.moveTo(pw+0.5,0); ctx.lineTo(pw+0.5,ph); ctx.stroke();
     ctx.fillStyle='#8793a6'; ctx.font='11px sans-serif'; ctx.textAlign='left';
-    for(var q=Math.ceil(yMin/step)*step; q<yMax; q+=step){
-      ctx.fillText(q.toFixed(step<1?2:0),pw+6,yOf(q)+4);
-    }
+    ticks.forEach(function(tk){ ctx.fillText(tk.t,pw+6,yOf(tk.p)+4); });
     if(manual){ ctx.fillStyle=DRAW_COLOR; ctx.fillText('수동',pw+6,12); }
     var lastBar=bars[bars.length-1], ly=yOf(lastBar.c);
     if(ly>0&&ly<ph) tag(fmtP(lastBar.c),ly,(lastBar.c>=lastBar.o)?UP_COLOR:DOWN_COLOR,'#ffffff');
     drawings.forEach(function(d){
-      if(d.k==='h'){ var yy=yOf(d.p); if(yy>0&&yy<ph) tag(fmtP(d.p),yy,DRAW_COLOR,'#1a1405'); }
+      if(d.k==='h'){ var yy=yOf(d.p); if(yy>0&&yy<ph) tag(fmtY(d.p),yy,DRAW_COLOR,'#1a1405'); }
     });
 
     ctx.fillStyle='#171d27'; ctx.fillRect(0,ph,W,AY);
@@ -583,13 +589,27 @@
     ctx.textAlign='left';
 
     if(inPlot){
-      tag(fmtP(pOf(mouse.y)),mouse.y,'#e8edf5','#10141b');
+      tag(fmtY(pOf(mouse.y)),mouse.y,'#e8edf5','#10141b');
       var ci=Math.max(0,Math.min(bars.length-1,Math.round(iOf(mouse.x)))), cxx=xOf(ci);
       var t=dstr(bars[ci]), tw=ctx.measureText(t).width+12;
       ctx.fillStyle='#e8edf5'; ctx.fillRect(Math.min(Math.max(0,cxx-tw/2),pw-tw),ph+2,tw,AY-4);
       ctx.fillStyle='#10141b'; ctx.textAlign='center';
       ctx.fillText(t,Math.min(Math.max(tw/2,cxx),pw-tw/2),ph+16); ctx.textAlign='left';
     }
+  }
+  function makeTicks(){
+    var out=[], b=base(), k;
+    if(mode==='pct'){
+      var a=(yMin-b)/b*100, z=(yMax-b)/b*100, s=niceStep(z-a,7);
+      var dec=(s>=1&&Math.abs(s%1)<1e-9)?0:(s>=0.1?1:2);
+      for(k=Math.ceil(a/s-1e-9); k*s<z; k++){
+        var q=k*s; out.push({p:b*(1+q/100), t:(q>0?'+':'')+q.toFixed(dec)+'%'});
+      }
+    }else{
+      var st=niceStep(yMax-yMin,7);
+      for(var v=Math.ceil(yMin/st)*st; v<yMax; v+=st) out.push({p:v,t:v.toFixed(st<1?2:0)});
+    }
+    return out;
   }
   function tag(text,y,bg,fg){
     ctx.font='11px sans-serif';
@@ -634,6 +654,31 @@
     ctx.fillText(l1,bx+8,by+16); ctx.fillText(l2,bx+8,by+31);
     ctx.lineWidth=1;
   }
+  var FIB=[0,0.236,0.382,0.5,0.618,0.786,1];
+  function segD(p,ax,ay,bx,by){var dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy,t=l?((p.x-ax)*dx+(p.y-ay)*dy)/l:0;t=Math.max(0,Math.min(1,t));return Math.hypot(p.x-(ax+t*dx),p.y-(ay+t*dy));}
+  function hitD(d,p){
+    if(d.k==='h') return Math.abs(yOf(d.p)-p.y);
+    if(d.k==='v') return Math.abs(xT(d.t)-p.x);
+    var x1=xT(d.t1),y1=yOf(d.p1),x2=xT(d.t2),y2=yOf(d.p2);
+    if(d.k==='l') return segD(p,x1,y1,x2,y2);
+    if(d.k==='r'){
+      var l=Math.min(x1,x2),r=Math.max(x1,x2),t=Math.min(y1,y2),b=Math.max(y1,y2);
+      if(p.x>=l&&p.x<=r&&p.y>=t&&p.y<=b) return 0;
+      return Math.hypot(Math.max(l-p.x,0,p.x-r),Math.max(t-p.y,0,p.y-b));
+    }
+    if(d.k==='f'){
+      var m=segD(p,x1,y1,x2,y2), xl=Math.min(x1,x2);
+      if(p.x>=xl-6) FIB.forEach(function(q){ m=Math.min(m,Math.abs(yOf(d.p2+(d.p1-d.p2)*q)-p.y)); });
+      return m;
+    }
+    return 1e9;
+  }
+  function eraseAt(p){
+    var bi=-1,bd=12;
+    drawings.forEach(function(d,i){ var v=hitD(d,p); if(v<=bd){bd=v;bi=i;} });
+    if(bi>=0){ drawings.splice(bi,1); save(); }
+    draw();
+  }
   function drawShape(d,isDraft){
     ctx.strokeStyle=DRAW_COLOR; ctx.lineWidth=1.5; ctx.setLineDash(isDraft?[5,4]:[]);
     if(d.k==='h'){
@@ -644,6 +689,17 @@
       ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,ph); ctx.stroke();
     }else if(d.k==='l'){
       ctx.beginPath(); ctx.moveTo(xT(d.t1),yOf(d.p1)); ctx.lineTo(xT(d.t2),yOf(d.p2)); ctx.stroke();
+    }else if(d.k==='f'){
+      var xa=xT(d.t1), xb=xT(d.t2), xl=Math.min(xa,xb);
+      ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(xa,yOf(d.p1)); ctx.lineTo(xb,yOf(d.p2)); ctx.stroke(); ctx.setLineDash([]);
+      FIB.forEach(function(r){
+        var pr=d.p2+(d.p1-d.p2)*r, yy=Math.round(yOf(pr))+0.5;
+        ctx.strokeStyle=r===0||r===1?DRAW_COLOR:'rgba(242,184,75,0.6)';
+        ctx.beginPath(); ctx.moveTo(xl,yy); ctx.lineTo(pw,yy); ctx.stroke();
+        ctx.fillStyle=DRAW_COLOR; ctx.font='11px sans-serif'; ctx.textAlign='left';
+        ctx.fillText(r+' ('+fmtY(pr)+')',Math.max(2,xl+4),yy-3);
+      });
+      ctx.strokeStyle=DRAW_COLOR;
     }else if(d.k==='r'){
       var x1=xT(d.t1),y1=yOf(d.p1),x2=xT(d.t2),y2=yOf(d.p2);
       ctx.fillStyle='rgba(242,184,75,0.12)';
@@ -674,6 +730,8 @@
       panning={x:p.x,y:p.y,left:left,min:yMin,max:yMax};
     }else if(tool==='h'){
       drawings.push({k:'h',p:pOf(p.y)}); save(); draw();
+    }else if(tool==='e'){
+      eraseAt(p);
     }else if(tool==='v'){
       drawings.push({k:'v',t:iToT(Math.round(iOf(p.x)))}); save(); draw();
     }else if(tool==='m'){
@@ -761,7 +819,7 @@
     var i=Math.max(0,Math.min(bars.length-1,Math.round(iOf(mouse.x)))), b=bars[i];
     var col=b.c>=b.o?UP_COLOR:DOWN_COLOR;
     infoEl.innerHTML='<b>'+dstr(b)+'</b> &nbsp; 시 '+fmtP(b.o)+' 고 '+fmtP(b.h)+' 저 '+fmtP(b.l)+
-      ' 종 <b style="color:'+col+'">'+fmtP(b.c)+'</b> &nbsp; 고점대비 '+(b.dd*100).toFixed(1)+'% &nbsp; '+VOLNAME+' '+
+      ' 종 <b style="color:'+col+'">'+fmtP(b.c)+'</b> ('+fmtPct(b.c)+') &nbsp; 커서 '+fmtP(pOf(mouse.y))+' ('+fmtPct(pOf(mouse.y))+') &nbsp; 고점대비 '+(b.dd*100).toFixed(1)+'% &nbsp; '+VOLNAME+' '+
       (b.vix!=null?b.vix.toFixed(1):'-')+(b.sig?' &nbsp; <b style="color:'+SIGCOL[b.sig]+'">x'+b.sig+' BUY</b>':'');
   }
 
@@ -789,6 +847,9 @@
       draft=null; meas=null;
     });
   });
+  function setMode(m){ mode=m; document.getElementById('mP').classList.toggle('on',m==='price'); document.getElementById('mPct').classList.toggle('on',m==='pct'); draw(); }
+  document.getElementById('mP').onclick=function(){setMode('price');};
+  document.getElementById('mPct').onclick=function(){setMode('pct');};
   document.getElementById('undo').onclick=function(){drawings.pop();save();draw();};
   document.getElementById('clear').onclick=function(){
     if(drawings.length&&confirm('그린 선을 모두 지울까요?')){drawings=[];save();draw();}
