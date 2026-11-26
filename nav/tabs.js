@@ -9,7 +9,6 @@
     ['/overview/', 'overview','Overview'],
     ['/smc/', 'SMC','SMC'],
     ['/fishing/', 'Fishing','Fish'],
-    ['/hub/', 'Trading View','Trading'],
     ['/divergence/', 'INDEX','INDEX'],
     ['/xyz100/', 'NASDAQ LIVE','NQ LIVE'],
     ['/kospi/', 'KOSPI LIVE','KS LIVE'],
