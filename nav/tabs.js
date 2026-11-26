@@ -4,17 +4,17 @@
   window.__tabs6683 = 1;
   var H = 42, KEY = '6683-tabs-order';
   var TABS = [
-    ['/dashboard/', 'Dashboard'],
-    ['/fractal-chart/', 'fractal-chart'],
-    ['/overview/', 'overview'],
-    ['/smc/', 'SMC'],
-    ['/fishing/', 'Fishing'],
-    ['/hub/', 'Trading View'],
-    ['/divergence/', 'INDEX'],
-    ['/xyz100/', 'NASDAQ LIVE'],
-    ['/kospi/', 'KOSPI LIVE'],
-    ['/nasdaq-alert/', 'NASDAQ ALERT'],
-    ['/kospi-alert/', 'KOSPI ALERT']
+    ['/dashboard/', 'Dashboard','Dash'],
+    ['/fractal-chart/', 'fractal-chart','Fractal'],
+    ['/overview/', 'overview','Overview'],
+    ['/smc/', 'SMC','SMC'],
+    ['/fishing/', 'Fishing','Fish'],
+    ['/hub/', 'Trading View','Trading'],
+    ['/divergence/', 'INDEX','INDEX'],
+    ['/xyz100/', 'NASDAQ LIVE','NQ LIVE'],
+    ['/kospi/', 'KOSPI LIVE','KS LIVE'],
+    ['/nasdaq-alert/', 'NASDAQ ALERT','NQ ALERT'],
+    ['/kospi-alert/', 'KOSPI ALERT','KS ALERT']
   ];
   var path = location.pathname.replace(/\/index\.html$/, '/');
   var page = ''; // 페이지별 겹침 보정용 이름
@@ -29,18 +29,18 @@
 
   var css =
     'html.t6683{box-sizing:border-box;padding-top:' + H + 'px}' +
-    '#t6683{position:fixed;top:0;left:0;right:0;height:' + H + 'px;z-index:10000;display:flex;align-items:center;gap:8px;' +
-    'padding:0 10px;background:#141a26;border-bottom:1px solid #232b3b;overflow-x:auto;overflow-y:hidden;white-space:nowrap;' +
+    '#t6683{position:fixed;top:0;left:0;right:0;height:' + H + 'px;z-index:10000;display:flex;align-items:center;gap:var(--tg,8px);' +
+    'padding:0 4px;background:#141a26;border-bottom:1px solid #232b3b;overflow:hidden;white-space:nowrap;flex-wrap:nowrap;' +
     '-webkit-overflow-scrolling:touch;scrollbar-width:none;font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;' +
     '-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}' +
     '#t6683::-webkit-scrollbar{display:none}' +
-    '#t6683 a{flex:none;display:inline-block;box-sizing:border-box;height:28px;line-height:26px;padding:0 14px;border:1px solid #2b3446;' +
-    'border-radius:6px;background:#1a2130;color:#e4e8f0;font-size:13px;text-decoration:none;cursor:pointer;touch-action:pan-x;' +
+    '#t6683 a{flex:none;display:inline-block;box-sizing:border-box;height:28px;line-height:26px;padding:0 var(--tp,14px);border:1px solid #2b3446;' +
+    'border-radius:6px;background:#1a2130;color:#e4e8f0;font-size:var(--tf,13px);text-decoration:none;cursor:pointer;touch-action:none;' +
     '-webkit-user-drag:none}' +
     '#t6683 a:hover{border-color:#8da2c8}' +
     '#t6683 a.on{background:#f2b84b;border-color:#f2b84b;color:#111;font-weight:700}' +
     '#t6683 a.drag{position:relative;z-index:2;opacity:.9;box-shadow:0 4px 14px rgba(0,0,0,.55);cursor:grabbing;transition:none}' +
-    '#t6683 a.home{color:#8b93a7;padding:0 11px}' +
+    '#t6683 a.home{color:#8b93a7}' +
     // 페이지별 겹침 보정 (고정 위치 요소를 탭바 아래로)
     'html[data-p6683="dashboard"] .row.max,html[data-p6683="dashboard"] .cell.max{top:' + H + 'px}' +
     'html[data-p6683="hub"] .tb{top:' + H + 'px!important}' +
@@ -65,6 +65,7 @@
     home.href = '/';
     home.className = 'home';
     home.textContent = '#6683';
+    home.setAttribute('data-hf', '#6683');
     home.draggable = false;
     bar.appendChild(home);
 
@@ -72,6 +73,8 @@
       var a = document.createElement('a');
       a.href = t[0];
       a.textContent = t[1];
+      a.setAttribute('data-f', t[1]);
+      a.setAttribute('data-s', t[2]);
       a.setAttribute('data-h', t[0]);
       a.draggable = false;
       if (page && t[0] === '/' + page + '/') a.className = 'on';
@@ -79,8 +82,23 @@
     });
     document.body.appendChild(bar);
 
-    var on = bar.querySelector('a.on');
-    if (on) { try { bar.scrollLeft = Math.max(0, on.offsetLeft - 60); } catch (e) {} }
+    // 항상 한 줄: 넘치면 글자 크기·여백을 줄여서 맞춤
+    function fit() {
+      var home = bar.querySelector('a.home'), as = bar.querySelectorAll('a[data-h]'), pass, f, ok = false;
+      for (pass = 0; pass < 2 && !ok; pass++) {
+        home.textContent = pass ? '#' : '#6683';
+        [].forEach.call(as, function (a) { a.textContent = a.getAttribute(pass ? 'data-s' : 'data-f'); });
+        for (f = 13; f >= (pass ? 6 : 8); f -= 0.5) {
+          bar.style.setProperty('--tf', f + 'px');
+          bar.style.setProperty('--tp', Math.max(1, Math.round(f * (pass ? 0.6 : 0.9))) + 'px');
+          bar.style.setProperty('--tg', Math.max(2, Math.round(f * 0.4)) + 'px');
+          if (bar.scrollWidth <= bar.clientWidth) { ok = true; break; }
+        }
+      }
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
     drag(bar);
   }
 
@@ -144,10 +162,6 @@
       cur.style.transform = 'none';
       var nr = cur.getBoundingClientRect();
       cur.style.transform = 'translateX(' + (lastX - grab - nr.left) + 'px)';
-      // 가장자리 자동 스크롤
-      var br = bar.getBoundingClientRect();
-      if (lastX < br.left + 40) bar.scrollLeft -= 10;
-      else if (lastX > br.right - 40) bar.scrollLeft += 10;
     }
 
     window.addEventListener('pointermove', function (e) {
