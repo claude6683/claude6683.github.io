@@ -105,7 +105,7 @@
 
     bar.addEventListener('pointerdown', function (e) {
       var a = e.target.closest ? e.target.closest('a[data-h]') : null;
-      if (!a || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      if (cur || !a || (e.pointerType === 'mouse' && e.button !== 0)) return;
       cur = a; pid = e.pointerId; sx = e.clientX; lastX = sx; mode = false; moved = false;
       touch = e.pointerType !== 'mouse';
       if (touch) {
