@@ -171,6 +171,11 @@ def spcx_news():
 
 
 out = {"updated": int(time.time()), "lows": lows(), "news": news(), "mon": mon(), "spcx": spcx_news()}
+try:
+    import dash_extra
+    out.update(dash_extra.build())
+except Exception as e:  # 추가 데이터 실패해도 기존 데이터는 유지
+    print("extra fail", e)
 if not out["lows"] and not out["news"]:
     raise SystemExit("no data")
 json.dump(out, open("dash.json", "w"), ensure_ascii=False, separators=(",", ":"))
