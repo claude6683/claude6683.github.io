@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XYZ100 + VIX BUY</title>
+</head>
+<body>
+<script>
+window.CFG = {
+  title: 'XYZ100 + VIX BUY',
+  h1: 'XYZ100 (나스닥100) · 52주 고점 대비 + VIX',
+  priceLabel: 'XYZ100 현재가',
+  coin: 'xyz:XYZ100',
+  storeKey: 'xyz100_drawings_v1',
+  volName: 'VIX',
+  volFormat: 'yahoo',
+  volFile: '../xyz-data/vix.json',
+  requireFull: true,
+  manual: false,
+  // [52주 고점 대비 하락 %, 변동성지수 이상] — x1, x2, x3 순서
+  tiers: [[18, 30], [25, 35], [30, 40]],
+  nav: [
+    {label: 'XYZ100 + VIX', href: '../xyz100/', on: true},
+    {label: 'KOSPI + VKOSPI', href: '../kospi/'}
+  ],
+  note: '가격: Hyperliquid xyz:XYZ100 (나스닥100 추종 무기한 선물, 24시간 거래, 실시간) · VIX: Yahoo Finance 일봉(자동 저장 파일, 수십 분 지연) · ' +
+        '52주 고점 = 최근 364일 일봉 고가 최고값 (XYZ100은 2025-10-13 상장이라 신호 계산은 2026-10-12부터 가능) · ' +
+        '신호는 x3 &gt; x2 &gt; x1 순서로 확인해 가장 센 단계 하나만 표시 · 시간은 한국시간 · 시간봉/4시간봉 신호는 그날 마지막 봉에 표시, 주봉은 그 주에 한 번이라도 신호가 있으면 표시 · ' +
+        '그리기: 도구를 고른 뒤 수평선·수직선은 클릭, 추세선·사각형은 드래그 · 가격 줄이기: 오른쪽 가격 숫자 영역을 위아래로 드래그(더블클릭하면 자동) · 학습·참고용이며 투자 권유가 아닙니다.'
+};
+</script>
+<script src="../xyz-shared/chart-core.js?v=6"></script>
+</body>
+</html>

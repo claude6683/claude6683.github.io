@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>코스피 5대 지표 고점·저점 경보</title>
+<style>
+:root{--bg:#10141b;--panel:#171d27;--line:#2a3342;--text:#d7dde8;--muted:#8793a6;--gold:#f2b84b;--green:#2fbf71;--red:#e5484d;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;font-size:14px}
+.page{max-width:1100px;margin:0 auto;padding:12px}
+nav{display:flex;gap:14px;margin-bottom:6px}
+nav a{color:var(--muted);text-decoration:none}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin:6px 0 10px}
+h1{font-size:18px;margin:0}
+#live{font-size:12px;color:var(--muted)}#live.on{color:var(--green)}#live.off{color:var(--red)}
+.stats{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:96px}
+.stat b{display:block;font-size:16px;margin-top:2px}
+.stat span{color:var(--muted);font-size:12px}
+.rules{display:grid;grid-template-columns:repeat(2,auto);justify-content:start;column-gap:28px;row-gap:6px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin-bottom:10px;color:var(--muted)}
+.rules input{width:56px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:4px;padding:3px 5px;font-size:14px}
+.grp{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.grp em{font-style:normal;font-weight:700;min-width:64px}
+.toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center}
+.toolbar .sp{flex:1}.toolbar .bar{width:1px;height:22px;background:var(--line);margin:0 2px}
+button,select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 11px;font-size:14px;cursor:pointer}
+button:hover,select:hover{border-color:var(--muted)}
+button.on{background:var(--gold);color:#1a1405;border-color:var(--gold);font-weight:700}
+#info{min-height:20px;margin-bottom:6px;color:var(--muted);font-size:13px;white-space:nowrap;overflow-x:auto}
+#info b{color:var(--text);font-weight:600}
+#wrap{position:relative;height:72vh;min-height:440px;background:var(--panel);border:1px solid var(--line);border-radius:6px;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;color:var(--muted);pointer-events:none;white-space:pre-line;background:rgba(23,29,39,.85)}
+#zin,#zout{display:none}
+#demo,#csvBtn{display:none}  
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:500}
+.s1{color:#f2b84b;font-weight:700}.s2{color:#ff5d73;font-weight:700}.b1{color:#7bd9a4;font-weight:700}.b2{color:#2fbf71;font-weight:700}
+.note{color:var(--muted);font-size:12px;margin-top:12px;line-height:1.6}
+@media(max-width:720px){.rules{grid-template-columns:1fr}}
+</style></head><body><div class="page">
+<div class="head"><h1>코스피(^KS11) 5대 지표 고점·저점 경보</h1><span id="live">연결 중…</span></div>
+<div class="stats">
+<div class="stat"><span>종가</span><b id="sC">-</b></div>
+<div class="stat"><span>RSI(14)</span><b id="sR">-</b></div>
+<div class="stat"><span id="lD">200일선 이격도</span><b id="sD">-</b></div>
+<div class="stat"><span>볼린저 %B</span><b id="sB">-</b></div>
+<div class="stat"><span>스토캐스틱 %K</span><b id="sK">-</b></div>
+<div class="stat"><span>MACD / Signal</span><b id="sM">-</b></div>
+<div class="stat"><span>최근 경보</span><b id="sS">-</b></div>
+</div>
+<div class="rules" id="rules"></div>
+<div class="toolbar">
+<label>봉 <select id="tf"><option value="1d">일봉</option><option value="1w">주봉</option><option value="1h">1&#49884;&#44036;&#48393;</option><option value="4h">4&#49884;&#44036;&#48393;</option></select></label>
+<span class="bar"></span>
+<button data-tool="none" class="on">이동</button><button data-tool="h">수평선</button><button data-tool="v">수직선</button><button data-tool="l">추세선</button><button data-tool="r">사각형</button><button data-tool="m">재기</button>
+<span class="bar"></span>
+<button id="undo">마지막 지우기</button><button id="clear">전체 지우기</button>
+<span class="bar"></span>
+<button id="demo">샘플(가상) 데이터</button><button id="csvBtn" type="button">CSV 불러오기</button><input id="csv" type="file" accept=".csv" style="display:none">
+<span class="sp"></span>
+<button id="reload">새로고침</button>
+</div>
+<div id="info">차트 위에 마우스를 올리면 정보가 보입니다.</div>
+<div id="wrap"><canvas id="cv"></canvas><div id="msg">불러오는 중…</div></div>
+<div class="tw"><table><thead><tr><th>날짜</th><th>종가</th><th>RSI</th><th>%B</th><th>%K</th><th>이격도</th><th>신호</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="note">경보 = 핵심 3지표(RSI·%B·%K) 동시 충족(핵심) + 보조 확인(200일 이격도 / %K·MACD 교차 / 20일선 이탈·반등) 중 하나 이상(확정). 과거 통계 기반 참고 도구이며 매매 권유가 아닙니다. 데이터는 일봉 종가 기준이고 일봉은 200일선, 주봉은 40주선(≈200일)을 기준으로 이격도를 계산합니다. 보조지표 칸 사이의 선을 끌면 크기가 바뀝니다. 선은 브라우저에 저장됩니다.</div>
+</div>
+<script>
+(function(){
+var SHOWSUB=false;
+var UP='#e5484d',DOWN='#3b82f6',GOLD='#f2b84b',AX=70,AY=24,DAY=864e5;
+var STEP={'1d':DAY,'1w':7*DAY,'1h':36e5,'4h':144e5},KEY='kospi_draw_v1';
+var FR0=[0.56,0.22,0.22],MINF=[0.2,0.08,0.08];
+var DEF={S:[['rsi',74,'RSI ≥'],['pb',1,'%B ≥'],['k',90,'%K ≥'],['dp',14.9,'이격도 ≥']],B:[['rsi',28,'RSI ≤'],['pb',0.05,'%B ≤'],['k',10,'%K ≤'],['dp',-12.5,'이격도 ≤']]};
+var $=function(i){return document.getElementById(i)};
+var cv=$('cv'),ctx=cv.getContext('2d'),wrap=$('wrap'),msg=$('msg'),info=$('info');
+var bars=[],daily=[],tf='1d',drawings=[],draft=null,meas=null,tool='none';
+var W=0,H=0,pw=0,dpr=1,left=0,barW=6,mouse=null,pan=null,axisDrag=null,divDrag=null;
+var fr=FR0.slice(),big=0,yMin=0,yMax=1,manual=false,mMin=0,mMax=1,H1=1,H2=1,H3=1,plotH=1,BTN=[];
+['S','B'].forEach(function(g){
+  var h='<div class="grp"><em class="'+(g==='S'?'s2':'b2')+'">'+(g==='S'?'고점 SELL':'저점 BUY')+'</em>';
+  DEF[g].forEach(function(r){h+=r[2]+' <input id="'+g+r[0]+'" type="number" step="any" value="'+r[1]+'">';});
+  $('rules').insertAdjacentHTML('beforeend',h+'</div>');
+});
+function T(g,k){return parseFloat($(g+k).value);}
+function showMsg(t){msg.style.display='flex';msg.textContent=t;}
+function hideMsg(){msg.style.display='none';}
+function f2(v){return v==null||isNaN(v)?'-':v.toFixed(2);}
+function fmtP(p){return p>=1000?p.toFixed(1):p.toFixed(2);}
+function ds(b){var s=new Date(b.t).toISOString();return (tf==='1h'||tf==='4h')?s.slice(0,16).replace('T',' '):s.slice(0,10);}
+// ===== 지표 계산 =====
+function sma(a,n){var o=[],s=0,i;for(i=0;i<a.length;i++){s+=a[i];if(i>=n)s-=a[i-n];o.push(i>=n-1?s/n:null);}return o;}
+function ema(a,n){var k=2/(n+1),o=[a[0]],i;for(i=1;i<a.length;i++)o.push(k*a[i]+(1-k)*o[i-1]);return o;}
+function compute(){
+  var n=bars.length,c=bars.map(function(b){return b.c}),i,j;
+  if(!n)return;
+  var ag=0,al=0;
+  for(i=0;i<n;i++){
+    bars[i].rsi=null;if(!i)continue;
+    var d=c[i]-c[i-1],g=d>0?d:0,l=d<0?-d:0;
+    if(i<=14){ag+=g/14;al+=l/14;}else{ag=(ag*13+g)/14;al=(al*13+l)/14;}
+    if(i>=14)bars[i].rsi=al===0?100:100-100/(1+ag/al);
+  }
+  var m20=sma(c,20),m200=sma(c,tf==='1w'?40:200),e12=ema(c,12),e26=ema(c,26);
+  var mac=e12.map(function(v,k){return v-e26[k]}),sg=ema(mac,9);
+  var rk=[];
+  for(i=0;i<n;i++){
+    var b=bars[i];
+    b.m20=m20[i];b.m200=m200[i];b.dp=m200[i]?(c[i]/m200[i]-1)*100:null;
+    b.macd=mac[i];b.sig9=sg[i];
+    if(m20[i]!=null){var s=0;for(j=i-19;j<=i;j++)s+=Math.pow(c[j]-m20[i],2);var sd=Math.sqrt(s/19);b.bu=m20[i]+2*sd;b.bl=m20[i]-2*sd;b.pb=sd?(c[i]-b.bl)/(b.bu-b.bl):null;}else{b.bu=b.bl=b.pb=null;}
+    if(i>=13){var hi=-1e18,lo=1e18;for(j=i-13;j<=i;j++){if(bars[j].h>hi)hi=bars[j].h;if(bars[j].l<lo)lo=bars[j].l;}rk.push(hi>lo?(c[i]-lo)/(hi-lo)*100:null);}else rk.push(null);
+  }
+  var kk=[];for(i=0;i<n;i++){var w=rk.slice(Math.max(0,i-2),i+1);kk.push(i>=15&&w.length===3&&w.indexOf(null)<0?(w[0]+w[1]+w[2])/3:null);}
+  var dd=[];for(i=0;i<n;i++){var w2=kk.slice(Math.max(0,i-2),i+1);dd.push(i>=17&&w2.length===3&&w2.indexOf(null)<0?(w2[0]+w2[1]+w2[2])/3:null);}
+  for(i=0;i<n;i++){bars[i].k=kk[i];bars[i].d=dd[i];}
+  signals();
+}
+function signals(){
+  var i,n=bars.length;
+  for(i=0;i<n;i++){
+    var b=bars[i],p=bars[i-1];b.ss=0;b.bs=0;
+    if(b.rsi==null||b.pb==null||b.k==null||b.dp==null||!p||p.k==null||p.d==null||b.d==null)continue;
+    if(b.rsi>=T('S','rsi')&&b.pb>=T('S','pb')&&b.k>=T('S','k')){
+      b.ss=1;
+      if(b.dp>=T('S','dp')||(b.k<b.d&&p.k>=p.d)||(b.macd<b.sig9&&p.macd>=p.sig9)||b.c<b.m20)b.ss=2;
+    }
+    if(b.rsi<=T('B','rsi')&&b.pb<=T('B','pb')&&b.k<=T('B','k')){
+      b.bs=1;
+      if(b.dp<=T('B','dp')||(b.k>b.d&&p.k<=p.d)||(b.macd>b.sig9&&p.macd<=p.sig9)||b.pb>p.pb)b.bs=2;
+    }
+  }
+}
+// ===== 상단 카드 / 표 =====
+function stats(){
+  var b=bars[bars.length-1],i,last=null;
+  if(!b)return;
+  $('sC').textContent=fmtP(b.c);$('lD').textContent=tf==='1w'?'40주선 이격도':'200일선 이격도';$('sR').textContent=f2(b.rsi);
+  $('sD').textContent=b.dp==null?'-':(b.dp>=0?'+':'')+b.dp.toFixed(1)+'%';
+  $('sB').textContent=f2(b.pb);$('sK').textContent=f2(b.k);
+  $('sM').textContent=f2(b.macd)+' / '+f2(b.sig9);
+  for(i=bars.length-1;i>=0;i--)if(bars[i].ss||bars[i].bs){last=bars[i];break;}
+  var s=$('sS');
+  if(last){var sell=last.ss>=last.bs&&last.ss>0;s.textContent=(sell?'SELL ':'BUY ')+(sell?last.ss:last.bs)+'단계 · '+ds(last);s.style.color=sell?'#ff5d73':'#2fbf71';}
+  else{s.textContent='없음';s.style.color='';}
+}
+function table(){
+  var r=[],i,h='';
+  for(i=bars.length-1;i>=0&&r.length<15;i--)if(bars[i].ss||bars[i].bs)r.push(bars[i]);
+  if(!r.length){$('rows').innerHTML='<tr><td colspan="7" style="text-align:center;color:#8793a6">조건에 맞는 경보가 없습니다</td></tr>';return;}
+  r.forEach(function(b){
+    var sell=b.ss>0&&b.ss>=b.bs,lv=sell?b.ss:b.bs;
+    h+='<tr><td>'+ds(b)+'</td><td>'+fmtP(b.c)+'</td><td>'+f2(b.rsi)+'</td><td>'+f2(b.pb)+'</td><td>'+f2(b.k)+'</td><td>'+(b.dp==null?'-':b.dp.toFixed(1)+'%')+'</td><td class="'+(sell?'s':'b')+lv+'">'+(sell?'SELL':'BUY')+' '+(lv===2?'확정':'핵심')+'</td></tr>';
+  });
+  $('rows').innerHTML=h;
+}
+function refresh(){compute();stats();table();draw();}
+// ===== 좌표 =====
+function layout(){
+  var r=wrap.getBoundingClientRect();dpr=window.devicePixelRatio||1;
+  W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);pw=W-AX;geo();
+}
+function geo(){plotH=H-AY;if(!SHOWSUB){H1=plotH;H2=0;H3=0;return;}H1=Math.round(plotH*fr[0]);H2=Math.round(plotH*fr[1]);H3=plotH-H1-H2;}
+function resetView(){barW=pw<500?4:6;left=bars.length-pw/barW+6;}
+function xOf(i){return (i-left)*barW+barW/2;}
+function iOf(x){return (x-barW/2)/barW+left;}
+function yOf(p){return H1-(p-yMin)/(yMax-yMin)*H1;}
+function pOf(y){return yMin+(H1-y)/H1*(yMax-yMin);}
+function xT(t){return xOf(tToI(t));}
+function clamp(){var v=pw/barW;left=Math.max(-5,Math.min(left,bars.length-v+12));}
+function nice(range,cnt){var r0=range/cnt,p=Math.pow(10,Math.floor(Math.log10(r0))),f=r0/p;return (f<1.5?1:f<3?2:f<7?5:10)*p;}
+function which(y){return y<H1?0:(y<H1+H2?1:(y<plotH?2:-1));}
+function sub(k){return k===1?{top:H1,h:H2,lo:0,hi:100}:{top:H1+H2,h:H3,lo:-0.25,hi:1.25};}
+function vOf(k,y){var s=sub(k);return s.lo+(s.top+s.h-y)/s.h*(s.hi-s.lo);}
+function divAt(p){if(!SHOWSUB)return -1;if(Math.abs(p.y-H1)<=4)return 0;if(Math.abs(p.y-(H1+H2))<=4)return 1;return -1;}
+function ensureManual(){if(!manual){manual=true;mMin=yMin;mMax=yMax;}}
+function zoomPrice(f,anchor){ensureManual();mMin=anchor-(anchor-mMin)*f;mMax=anchor+(mMax-anchor)*f;draw();}
+function setSize(act,k){
+  if(act==='orig'){fr=FR0.slice();big=0;}
+  else{fr=(k===1)?[0.3,0.5,0.2]:[0.3,0.2,0.5];big=k;}
+  geo();draw();
+}
+// ===== 그리기 =====
+function tag(text,y,bg,fg){
+  ctx.font='11px sans-serif';ctx.fillStyle=bg;ctx.fillRect(pw,y-9,AX,18);
+  ctx.fillStyle=fg;ctx.textAlign='left';ctx.fillText(text,pw+6,y+4);
+}
+function mkBtn(txt,x,y,w,on,k,act){
+  ctx.fillStyle=on?GOLD:'#10141b';ctx.fillRect(x,y,w,18);
+  ctx.strokeStyle='#2a3342';ctx.lineWidth=1;ctx.strokeRect(x+0.5,y+0.5,w-1,17);
+  ctx.fillStyle=on?'#1a1405':'#d7dde8';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(txt,x+w/2,y+13);ctx.textAlign='left';
+  BTN.push({x:x,y:y,w:w,h:18,k:k,act:act});
+}
+function drawSub(k,lines,series,label){if(!SHOWSUB)return;
+  var s=sub(k),top=s.top,h=s.h,lo=s.lo,hi=s.hi;
+  function y(v){return top+h-(v-lo)/(hi-lo)*h;}
+  var a=Math.max(0,Math.floor(left)),z=Math.min(bars.length-1,Math.ceil(left+pw/barW));
+  ctx.save();ctx.beginPath();ctx.rect(0,top,pw,h);ctx.clip();
+  ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  lines.forEach(function(L){var yy=Math.round(y(L.v))+0.5;ctx.strokeStyle=L.c;ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(pw,yy);ctx.stroke();});
+  ctx.setLineDash([]);
+  series.forEach(function(S){
+    ctx.strokeStyle=S.c;ctx.lineWidth=1.4;ctx.beginPath();var st=false,i;
+    for(i=a;i<=z;i++){var v=bars[i][S.k];if(v==null){st=false;continue;}var px=xOf(i),py=y(Math.max(lo,Math.min(hi,v)));if(st)ctx.lineTo(px,py);else{ctx.moveTo(px,py);st=true;}}
+    ctx.stroke();
+  });
+  ctx.restore();
+  ctx.fillStyle='#8793a6';ctx.font='11px sans-serif';ctx.textAlign='left';
+  lines.forEach(function(L){ctx.fillText(L.t,pw+6,y(L.v)+4);});
+  ctx.fillText(label,6,top+14);
+  if(h>=30){mkBtn('원본',pw-52,top+3,46,false,k,'orig');mkBtn('창크게',pw-108,top+3,52,big===k,k,'big');}
+}
+function drawShape(d,isDraft){
+  ctx.strokeStyle=GOLD;ctx.lineWidth=1.5;ctx.setLineDash(isDraft?[5,4]:[]);
+  if(d.k==='h'){var y=Math.round(yOf(d.p))+0.5;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(pw,y);ctx.stroke();}
+  else if(d.k==='v'){var x=Math.round(xT(d.t))+0.5;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H1);ctx.stroke();}
+  else if(d.k==='l'){ctx.beginPath();ctx.moveTo(xT(d.t1),yOf(d.p1));ctx.lineTo(xT(d.t2),yOf(d.p2));ctx.stroke();}
+  else if(d.k==='r'){var x1=xT(d.t1),y1=yOf(d.p1),x2=xT(d.t2),y2=yOf(d.p2);ctx.fillStyle='rgba(242,184,75,0.12)';ctx.fillRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));ctx.strokeRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));}
+  ctx.setLineDash([]);ctx.lineWidth=1;
+}
+function fmtDur(ms){
+  ms=Math.abs(ms);
+  if(ms>=DAY){var d=Math.floor(ms/DAY),h=Math.round((ms%DAY)/36e5);if(h===24){d++;h=0;}return d+'일'+(h?' '+h+'시간':'');}
+  if(ms>=36e5)return Math.round(ms/36e5)+'시간';
+  return Math.round(ms/6e4)+'분';
+}
+function drawMeasure(){
+  if(!meas)return;
+  var x1=xT(meas.t1),y1=yOf(meas.p1),x2=xT(meas.t2),y2=yOf(meas.p2);
+  var diff=meas.p2-meas.p1,pct=meas.p1?diff/meas.p1*100:0,up=diff>=0,col=up?UP:DOWN;
+  var nb=Math.abs(Math.round(tToI(meas.t2)-tToI(meas.t1)));
+  ctx.setLineDash([]);
+  ctx.fillStyle=up?'rgba(229,72,77,0.14)':'rgba(59,130,246,0.14)';
+  ctx.fillRect(Math.min(x1,x2),Math.min(y1,y2),Math.abs(x2-x1),Math.abs(y2-y1));
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  var ang=Math.atan2(y2-y1,x2-x1);
+  ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-9*Math.cos(ang-0.45),y2-9*Math.sin(ang-0.45));
+  ctx.moveTo(x2,y2);ctx.lineTo(x2-9*Math.cos(ang+0.45),y2-9*Math.sin(ang+0.45));ctx.stroke();
+  var sg=up?'+':'\u2212';
+  var l1=sg+fmtP(Math.abs(diff))+' ('+sg+Math.abs(pct).toFixed(2)+'%)',l2=nb+'봉 · '+fmtDur(meas.t2-meas.t1);
+  ctx.font='bold 12px sans-serif';ctx.textAlign='left';
+  var bw2=Math.max(ctx.measureText(l1).width,ctx.measureText(l2).width)+16,bh=38;
+  var bx=(x1+x2)/2-bw2/2,by=up?Math.min(y1,y2)-bh-6:Math.max(y1,y2)+6;
+  bx=Math.max(2,Math.min(pw-bw2-2,bx));by=Math.max(2,Math.min(H1-bh-2,by));
+  ctx.fillStyle=col;ctx.fillRect(bx,by,bw2,bh);
+  ctx.fillStyle='#ffffff';ctx.fillText(l1,bx+8,by+16);ctx.fillText(l2,bx+8,by+31);
+  ctx.lineWidth=1;
+}
+function draw(){
+  ctx.clearRect(0,0,W,H);BTN=[];
+  if(!bars.length)return;
+  clamp();geo();
+  var a=Math.max(0,Math.floor(left)),z=Math.min(bars.length-1,Math.ceil(left+pw/barW)),i,p,lo=1e18,hi=-1e18;
+  for(i=a;i<=z;i++){var b=bars[i];[b.l,b.bl,b.m200].forEach(function(v){if(v!=null&&v<lo)lo=v;});[b.h,b.bu,b.m200].forEach(function(v){if(v!=null&&v>hi)hi=v;});}
+  if(hi<=lo){lo=0;hi=1;}
+  var pad=(hi-lo)*0.06;
+  if(manual){yMin=mMin;yMax=mMax;}else{yMin=lo-pad;yMax=hi+pad;}
+  var step=nice(yMax-yMin,7);
+  // --- 가격 패널 ---
+  ctx.save();ctx.beginPath();ctx.rect(0,0,pw,H1);ctx.clip();
+  ctx.strokeStyle='#222b39';ctx.lineWidth=1;
+  for(p=Math.ceil(yMin/step)*step;p<yMax;p+=step){var yy=Math.round(yOf(p))+0.5;ctx.beginPath();ctx.moveTo(0,yy);ctx.lineTo(pw,yy);ctx.stroke();}
+  function line(k,col,dash){ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.setLineDash(dash||[]);ctx.beginPath();var st=false,j;for(j=a;j<=z;j++){var v=bars[j][k];if(v==null){st=false;continue;}if(st)ctx.lineTo(xOf(j),yOf(v));else{ctx.moveTo(xOf(j),yOf(v));st=true;}}ctx.stroke();ctx.setLineDash([]);}
+  line('bu','rgba(135,147,166,.7)',[4,3]);line('bl','rgba(135,147,166,.7)',[4,3]);line('m20','rgba(135,147,166,.5)');line('m200','#f2b84b',[8,3]);
+  var bw=Math.max(1,Math.floor(barW*0.7));
+  for(i=a;i<=z;i++){
+    var c=bars[i],x=Math.round(xOf(i)),col=c.c>=c.o?UP:DOWN;
+    ctx.strokeStyle=col;ctx.fillStyle=col;ctx.beginPath();ctx.moveTo(x+0.5,yOf(c.h));ctx.lineTo(x+0.5,yOf(c.l));ctx.stroke();
+    var y1=yOf(Math.max(c.o,c.c)),y2=yOf(Math.min(c.o,c.c));ctx.fillRect(x-Math.floor(bw/2),y1,bw,Math.max(1,y2-y1));
+  }
+  var sz=Math.max(4,barW*0.8);
+  for(i=a;i<=z;i++){
+    var s=bars[i],sx=xOf(i);
+    if(s.ss){var sy=yOf(s.h)-8;ctx.fillStyle=s.ss===2?'#ff5d73':'#f2b84b';ctx.beginPath();ctx.moveTo(sx,sy);ctx.lineTo(sx-sz,sy-sz*1.6);ctx.lineTo(sx+sz,sy-sz*1.6);ctx.closePath();ctx.fill();}
+    if(s.bs){var by=yOf(s.l)+8;ctx.fillStyle=s.bs===2?'#2fbf71':'#7bd9a4';ctx.beginPath();ctx.moveTo(sx,by);ctx.lineTo(sx-sz,by+sz*1.6);ctx.lineTo(sx+sz,by+sz*1.6);ctx.closePath();ctx.fill();}
+  }
+  drawings.forEach(function(d){drawShape(d,false);});
+  if(draft)drawShape(draft,true);
+  drawMeasure();
+  ctx.restore();
+  ctx.fillStyle='#8793a6';ctx.font='11px sans-serif';ctx.textAlign='left';
+  ctx.fillText('BB(20,2σ) · 20일선 · 200일선(금색)',6,14);
+  // --- 보조지표 패널 ---
+  drawSub(1,[{v:T('S','rsi'),c:'#5a2f36',t:String(T('S','rsi'))},{v:T('B','rsi'),c:'#1f4a35',t:String(T('B','rsi'))}],[{k:'rsi',c:'#f2b84b'},{k:'k',c:'#6aa9ff'}],'RSI(금색) · 스토캐스틱 %K(파랑)');
+  drawSub(2,[{v:T('S','pb'),c:'#5a2f36',t:String(T('S','pb'))},{v:T('B','pb'),c:'#1f4a35',t:String(T('B','pb'))}],[{k:'pb',c:'#d7dde8'}],'볼린저 %B');
+  // --- 칸 경계선(끌어서 크기 조절) ---
+  (SHOWSUB?[H1,H1+H2]:[]).forEach(function(yy){
+    ctx.strokeStyle='#3a4558';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(0,yy+0.5);ctx.lineTo(W,yy+0.5);ctx.stroke();
+    ctx.fillStyle='#55627a';ctx.fillRect(pw/2-16,yy-1,32,3);
+  });
+  ctx.strokeStyle='#2a3342';ctx.beginPath();ctx.moveTo(pw+0.5,0);ctx.lineTo(pw+0.5,plotH);ctx.stroke();
+  // --- 가격 눈금, 마지막 가격 ---
+  ctx.fillStyle='#8793a6';ctx.font='11px sans-serif';ctx.textAlign='left';
+  for(p=Math.ceil(yMin/step)*step;p<yMax;p+=step){ctx.fillText(p.toFixed(0),pw+6,yOf(p)+4);}
+  if(manual){ctx.fillStyle=GOLD;ctx.fillText('수동',pw+6,12);}
+  var lb=bars[bars.length-1],ly=yOf(lb.c);
+  if(ly>0&&ly<H1)tag(fmtP(lb.c),ly,lb.c>=lb.o?UP:DOWN,'#ffffff');
+  drawings.forEach(function(d){if(d.k==='h'){var hy=yOf(d.p);if(hy>0&&hy<H1)tag(fmtP(d.p),hy,GOLD,'#1a1405');}});
+  // --- 날짜 축 ---
+  ctx.fillStyle='#171d27';ctx.fillRect(0,plotH,W,AY);
+  ctx.strokeStyle='#2a3342';ctx.beginPath();ctx.moveTo(0,plotH+0.5);ctx.lineTo(pw,plotH+0.5);ctx.stroke();
+  ctx.fillStyle='#8793a6';ctx.textAlign='center';ctx.font='11px sans-serif';
+  var lk='',lx=-999;
+  for(i=a;i<=z;i++){var k2=ds(bars[i]).slice(0,7),xx=xOf(i);if(k2!==lk){lk=k2;if(xx>20&&xx<pw-20&&xx-lx>=52){ctx.fillText(k2.slice(2),xx,plotH+16);lx=xx;}}}
+  ctx.textAlign='left';
+  // --- 십자선 ---
+  var inPlot=mouse&&mouse.x>=0&&mouse.x<pw&&mouse.y>=0&&mouse.y<plotH;
+  if(inPlot){
+    var ci=Math.max(0,Math.min(bars.length-1,Math.round(iOf(mouse.x)))),cx=Math.round(xOf(ci))+0.5,my=Math.round(mouse.y)+0.5;
+    ctx.setLineDash([4,4]);ctx.strokeStyle='#7d8aa0';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(0,my);ctx.lineTo(pw,my);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,plotH);ctx.stroke();
+    ctx.setLineDash([]);
+    var kk=which(mouse.y);
+    tag(kk===0?fmtP(pOf(mouse.y)):f2(vOf(kk,mouse.y)),mouse.y,'#e8edf5','#10141b');
+    var t=ds(bars[ci]),tw=ctx.measureText(t).width+12;
+    ctx.fillStyle='#e8edf5';ctx.fillRect(Math.min(Math.max(0,cx-tw/2),pw-tw),plotH+2,tw,AY-4);
+    ctx.fillStyle='#10141b';ctx.textAlign='center';ctx.fillText(t,Math.min(Math.max(tw/2,cx),pw-tw/2),plotH+16);ctx.textAlign='left';
+  }
+}
+function showInfo(){
+  if(!mouse||!bars.length||mouse.x>=pw||mouse.y>=plotH)return;
+  var i=Math.max(0,Math.min(bars.length-1,Math.round(iOf(mouse.x)))),b=bars[i],col=b.c>=b.o?UP:DOWN;
+  info.innerHTML='<b>'+ds(b)+'</b> &nbsp; 시 '+fmtP(b.o)+' 고 '+fmtP(b.h)+' 저 '+fmtP(b.l)+' 종 <b style="color:'+col+'">'+fmtP(b.c)+'</b> &nbsp; RSI '+f2(b.rsi)+' &nbsp; %B '+f2(b.pb)+' &nbsp; %K '+f2(b.k)+' &nbsp; 이격도 '+(b.dp==null?'-':b.dp.toFixed(1)+'%')+(b.ss?' &nbsp; <b style="color:#ff5d73">SELL '+b.ss+'</b>':'')+(b.bs?' &nbsp; <b style="color:#2fbf71">BUY '+b.bs+'</b>':'');
+}
+// ===== 마우스 / 터치 =====
+function pos(e){var r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top};}
+cv.addEventListener('pointerdown',function(e){
+  var p=pos(e),i;
+  if(!bars.length)return;
+  for(i=0;i<BTN.length;i++){var b=BTN[i];if(p.x>=b.x&&p.x<=b.x+b.w&&p.y>=b.y&&p.y<=b.y+b.h){setSize(b.act,b.k);return;}}
+  cv.setPointerCapture(e.pointerId);
+  var dv=divAt(p);
+  if(dv>=0){divDrag={i:dv,y:p.y,f:fr.slice()};return;}
+  if(p.x>=pw&&p.y<H1){ensureManual();axisDrag={y:p.y,min:mMin,max:mMax};return;}
+  if(p.y>=plotH)return;
+  mouse=p;
+  if(tool==='none'||p.x>=pw||p.y>=H1){pan={x:p.x,y:p.y,left:left,min:yMin,max:yMax,price:p.y<H1};return;}
+  if(tool==='h'){drawings.push({k:'h',p:pOf(p.y)});save();draw();}
+  else if(tool==='v'){drawings.push({k:'v',t:iToT(Math.round(iOf(p.x)))});save();draw();}
+  else if(tool==='m'){var tm=iToT(Math.round(iOf(p.x))),pm=pOf(p.y);meas={t1:tm,p1:pm,t2:tm,p2:pm,live:true};}
+  else{var t0=iToT(iOf(p.x)),p0=pOf(p.y);draft={k:tool,t1:t0,p1:p0,t2:t0,p2:p0};}
+});
+cv.addEventListener('pointermove',function(e){
+  var p=pos(e);mouse=p;
+  if(divDrag){
+    var dy=(p.y-divDrag.y)/plotH,f=divDrag.f;
+    if(divDrag.i===0){dy=Math.max(MINF[0]-f[0],Math.min(f[1]-MINF[1],dy));fr=[f[0]+dy,f[1]-dy,f[2]];}
+    else{dy=Math.max(MINF[1]-f[1],Math.min(f[2]-MINF[2],dy));fr=[f[0],f[1]+dy,f[2]-dy];}
+    big=0;draw();return;
+  }
+  if(axisDrag){
+    var fz=Math.exp((p.y-axisDrag.y)*0.006),cc=(axisDrag.min+axisDrag.max)/2;
+    mMin=cc-(cc-axisDrag.min)*fz;mMax=cc+(axisDrag.max-cc)*fz;draw();return;
+  }
+  if(!pan&&!draft&&!meas){cv.style.cursor=(divAt(p)>=0||(p.x>=pw&&p.y<H1))?'ns-resize':(tool==='none'?'grab':'crosshair');}
+  if(pan){
+    left=pan.left-(p.x-pan.x)/barW;
+    if(manual&&pan.price){var dp=(p.y-pan.y)/H1*(pan.max-pan.min);mMin=pan.min+dp;mMax=pan.max+dp;}
+  }else if(draft){draft.t2=iToT(iOf(p.x));draft.p2=pOf(p.y);}
+  else if(meas&&meas.live){meas.t2=iToT(Math.round(iOf(p.x)));meas.p2=pOf(p.y);}
+  showInfo();draw();
+});
+function endPointer(){
+  divDrag=null;axisDrag=null;pan=null;
+  if(meas&&meas.live){meas.live=false;if(Math.abs(xT(meas.t2)-xT(meas.t1))+Math.abs(yOf(meas.p2)-yOf(meas.p1))<4)meas=null;}
+  if(draft){var d=draft;draft=null;if(Math.abs(xT(d.t2)-xT(d.t1))+Math.abs(yOf(d.p2)-yOf(d.p1))>4){drawings.push(d);save();}}
+  draw();
+}
+cv.addEventListener('pointerup',endPointer);cv.addEventListener('pointercancel',endPointer);
+cv.addEventListener('pointerleave',function(e){
+  if(e.pointerType==='mouse'&&!pan&&!draft&&!axisDrag&&!divDrag){mouse=null;info.textContent='차트 위에 마우스를 올리면 정보가 보입니다.';draw();}
+});
+cv.addEventListener('dblclick',function(e){var p=pos(e);if(p.x>=pw&&p.y<H1){manual=false;draw();}});
+cv.addEventListener('wheel',function(e){
+  e.preventDefault();if(!bars.length)return;
+  var p=pos(e);
+  if((p.x>=pw&&p.y<H1)||e.shiftKey){zoomPrice(e.deltaY<0?0.88:1/0.88,p.y<H1?pOf(p.y):(yMin+yMax)/2);return;}
+  var idx=iOf(p.x);barW=Math.max(2,Math.min(40,barW*(e.deltaY<0?1.12:1/1.12)));left=idx-(p.x-barW/2)/barW;draw();
+},{passive:false});
+document.querySelectorAll('[data-tool]').forEach(function(btn){btn.addEventListener('click',function(){
+  tool=btn.getAttribute('data-tool');
+  document.querySelectorAll('[data-tool]').forEach(function(b){b.classList.toggle('on',b===btn);});
+  cv.style.cursor=tool==='none'?'grab':'crosshair';draft=null;meas=null;draw();
+});});
+$('undo').onclick=function(){drawings.pop();save();draw();};
+$('clear').onclick=function(){if(drawings.length&&confirm('그린 선을 모두 지울까요?')){drawings=[];save();draw();}};
+$('tf').onchange=function(){
+  tf=this.value;manual=false;meas=null;
+  if(tf==='1h'||tf==='4h'){
+    if(!intra.length){loadIntra();return;}
+    build();refresh();resetView();draw();fixLabel();return;
+  }
+  if(!daily.length)return;
+  build();refresh();resetView();draw();
+};
+  ['S','B'].forEach(function(g){DEF[g].forEach(function(r){$(g+r[0]).addEventListener('input',function(){if(!bars.length)return;signals();stats();table();draw();});});});
+// ===== 데이터 =====
+function build(){
+  if(tf==='1h'){bars=intra.map(function(x){return Object.assign({},x);});return;}
+  if(tf==='4h'){bars=group4();return;}
+  if(tf==='1d'){bars=daily.map(function(x){return Object.assign({},x);});return;}
+  var out=[],cur=null,key=-1;
+  daily.forEach(function(x){var wk=x.t-((new Date(x.t).getUTCDay()+6)%7)*DAY;
+    if(wk!==key){key=wk;cur={t:wk,o:x.o,h:x.h,l:x.l,c:x.c};out.push(cur);}
+    else{if(x.h>cur.h)cur.h=x.h;if(x.l<cur.l)cur.l=x.l;cur.c=x.c;}});
+  bars=out;
+}
+function tToI(t){var n=bars.length;if(!n)return 0;if(t>=bars[n-1].t)return n-1+(t-bars[n-1].t)/STEP[tf];if(t<=bars[0].t)return (t-bars[0].t)/STEP[tf];
+  var lo=0,hi=n-1;while(hi-lo>1){var m=(lo+hi)>>1;if(bars[m].t<=t)lo=m;else hi=m;}return lo+(t-bars[lo].t)/(bars[lo+1].t-bars[lo].t);}
+function iToT(i){var n=bars.length;if(!n)return 0;if(i<=0)return bars[0].t+i*STEP[tf];if(i>=n-1)return bars[n-1].t+(i-n+1)*STEP[tf];
+  var lo=Math.floor(i),f=i-lo;return bars[lo].t+f*(bars[lo+1].t-bars[lo].t);}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(drawings));}catch(e){}}
+try{var a0=JSON.parse(localStorage.getItem(KEY)||'[]');if(Array.isArray(a0))drawings=a0;}catch(e){}
+function setBars(a,label){
+  daily=a;manual=false;meas=null;build();layout();refresh();resetView();hideMsg();draw();
+  var l=$('live');l.className='';l.textContent=label;
+  if(bars.length<(tf==='1w'?41:201))info.textContent='⚠ 이동평균 계산에는 일봉 200개·주봉 40개 이상의 데이터가 필요합니다.';
+}
+function fetchJ(u,ms){var c=new AbortController(),t=setTimeout(function(){c.abort();},ms||8000);return fetch(u,{signal:c.signal}).then(function(r){clearTimeout(t);if(!r.ok)throw 0;return r.json();});}
+function parseY(j){
+  var r=j.chart.result[0],q=r.indicators.quote[0],off=r.meta.gmtoffset||0,o=[],k;
+  for(k=0;k<r.timestamp.length;k++){if(q.close[k]==null||q.open[k]==null||q.high[k]==null||q.low[k]==null)continue;
+    var d=new Date((r.timestamp[k]+off)*1000).toISOString().slice(0,10);o.push({t:Date.parse(d+'T00:00:00Z'),o:q.open[k],h:q.high[k],l:q.low[k],c:q.close[k]});}
+  if(!o.length)throw 0;return o;
+}
+function load(){
+  showMsg('불러오는 중…');
+  var y='https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=10y&interval=1d';
+  var px=['https://corsproxy.io/?','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy?quest='].map(function(p){return p+encodeURIComponent(y);});
+  function chk(j){if(!j||!j.chart||!j.chart.result)throw 0;return j;}
+  fetchJ('../xyz-data/kospi.json?t='+Date.now()).then(chk).catch(function(){
+    return new Promise(function(res,rej){var f=0;px.forEach(function(u){fetchJ(u).then(chk).then(res,function(){if(++f===px.length)rej();});});});
+  }).then(function(j){setBars(parseY(j),'Yahoo Finance 일봉 (실시간 아님)');}).catch(function(){
+    $('live').className='off';$('live').textContent='● 자동 수집 실패';
+    showMsg('데이터를 자동으로 불러오지 못했습니다.\n"CSV 불러오기"(Yahoo Finance ^KS11 일봉 CSV)를 쓰거나\n"샘플(가상) 데이터"로 화면만 확인하세요.');
+  });
+}
+function csv(txt){
+  var L=txt.trim().split(/\r?\n/),h=L[0].split(',').map(function(s){return s.trim().toLowerCase();}),ix={d:h.indexOf('date'),o:h.indexOf('open'),h:h.indexOf('high'),l:h.indexOf('low'),c:h.indexOf('close')},o=[],i;
+  if(ix.d<0||ix.c<0)throw 0;
+  for(i=1;i<L.length;i++){var s=L[i].split(','),t=Date.parse(s[ix.d].slice(0,10)+'T00:00:00Z'),v=[ix.o,ix.h,ix.l,ix.c].map(function(k){return parseFloat(s[k]);});if(isNaN(t)||v.some(isNaN))continue;o.push({t:t,o:v[0],h:v[1],l:v[2],c:v[3]});}
+  o.sort(function(a,b){return a.t-b.t;});if(!o.length)throw 0;return o;
+}
+$('csvBtn').onclick=function(){$('csv').click();};
+$('csv').onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{setBars(csv(r.result),'CSV 데이터 ('+f.name+')');}catch(x){showMsg('CSV 형식을 읽지 못했습니다.\nDate, Open, High, Low, Close 열이 필요합니다.');}};r.readAsText(f);};
+$('demo').onclick=function(){
+  var s=7,rnd=function(){s=(s*16807)%2147483647;return s/2147483647;},p=2500,o=[],t=Date.UTC(2024,10,1),i;
+  for(i=0;o.length<520;i++){var d=new Date(t+i*DAY).getUTCDay();if(d===0||d===6)continue;
+    var drift=Math.sin(o.length/55)*0.0012,ch=drift+(rnd()-0.5)*0.03,op=p,cl=p*(1+ch);
+    o.push({t:t+i*DAY,o:op,h:Math.max(op,cl)*(1+rnd()*0.007),l:Math.min(op,cl)*(1-rnd()*0.007),c:cl});p=cl;}
+  setBars(o,'⚠ 샘플(가상) 데이터 — 실제 코스피가 아닙니다');
+};
+$('reload').onclick=load;
+var intra=[];
+function parseI(j){
+  var r=j.chart.result[0],q=r.indicators.quote[0],off=r.meta.gmtoffset||0,o=[],k;
+  for(k=0;k<r.timestamp.length;k++){
+    if(q.close[k]==null||q.open[k]==null||q.high[k]==null||q.low[k]==null)continue;
+    o.push({t:(r.timestamp[k]+off)*1000,o:q.open[k],h:q.high[k],l:q.low[k],c:q.close[k]});
+  }
+  if(!o.length)throw 0;return o;
+}
+function group4(){
+  var out=[],cur=null,key='';
+  intra.forEach(function(x){
+    var dt=new Date(x.t),k=dt.toISOString().slice(0,10)+(dt.getUTCHours()<13?'a':'b');
+    if(k!==key){key=k;cur={t:x.t,o:x.o,h:x.h,l:x.l,c:x.c};out.push(cur);}
+    else{if(x.h>cur.h)cur.h=x.h;if(x.l<cur.l)cur.l=x.l;cur.c=x.c;}
+  });
+  return out;
+}
+function fixLabel(){if(tf==='1h'||tf==='4h')$('lD').textContent='Dev. vs 200-bar MA';}
+function loadIntra(){
+  showMsg('Loading intraday data...');
+  var y='https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=700d&interval=60m';
+  var px=['https://corsproxy.io/?','https://api.allorigins.win/raw?url=','https://api.codetabs.com/v1/proxy?quest='].map(function(p){return p+encodeURIComponent(y);});
+  function chk(j){if(!j||!j.chart||!j.chart.result)throw 0;return j;}
+  fetchJ('../xyz-data/kospi60.json?t='+Date.now(),15000).then(chk).catch(function(){
+    return new Promise(function(res,rej){var f=0;px.forEach(function(u){fetchJ(u,15000).then(chk).then(res,function(){if(++f===px.length)rej();});});});
+  }).then(function(j){
+    intra=parseI(j);manual=false;meas=null;build();layout();refresh();resetView();hideMsg();draw();fixLabel();
+    var l=$('live');l.className='';l.textContent='Yahoo Finance 60m (not realtime)';
+  }).catch(function(){
+    $('live').className='off';$('live').textContent='intraday load failed';
+    showMsg('Failed to load intraday (1h/4h) data.\nPress the reload button, or switch back to the daily chart.');
+  });
+}
+$('reload').onclick=function(){if(tf==='1h'||tf==='4h')loadIntra();else load();};
+cv.style.cursor='grab';
+window.addEventListener('resize',function(){if(!bars.length)return;layout();draw();});
+layout();load();
+})();
+</script></body></html>

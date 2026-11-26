@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KOSPI + VKOSPI BUY</title>
+</head>
+<body>
+<script>
+window.CFG = {
+  title: 'KOSPI + VKOSPI BUY',
+  h1: 'KOSPI 200 (KR200) · 52주 고점 대비 + VKOSPI',
+  priceLabel: 'KR200 현재가',
+  coin: 'xyz:KR200',
+  storeKey: 'kospi_drawings_v1',
+  volName: 'VKOSPI',
+  volFormat: 'map',
+  volFile: '../xyz-data/vkospi.json',
+  requireFull: false,
+  manual: true,
+  // [52주 고점 대비 하락 %, 변동성지수 이상] — x1, x2, x3 순서
+  tiers: [[15, 30], [30, 50], [50, 85]],
+  nav: [
+    {label: 'XYZ100 + VIX', href: '../xyz100/'},
+    {label: 'KOSPI + VKOSPI', href: '../kospi/', on: true}
+  ],
+  note: '가격: Hyperliquid xyz:KR200 (코스피200 추종 무기한 선물, 24시간 거래, 실시간) · VKOSPI: 자동 저장 파일(한국 장 시간에 30분마다 갱신, 수집 실패 시 직접 입력) · ' +
+        '52주 고점 = 최근 364일 일봉 고가 최고값 (상장 이후 데이터가 1년 미만이면 상장 이후 최고가 기준) · ' +
+        '신호는 x3 &gt; x2 &gt; x1 순서로 확인해 가장 센 단계 하나만 표시 · 휴장일에는 직전 VKOSPI 값을 이어서 사용 · 시간은 한국시간 · 시간봉/4시간봉 신호는 그날 마지막 봉에 표시, 주봉은 그 주에 한 번이라도 신호가 있으면 표시 · ' +
+        '그리기: 도구를 고른 뒤 수평선·수직선은 클릭, 추세선·사각형은 드래그 · 가격 줄이기: 오른쪽 가격 숫자 영역을 위아래로 드래그(더블클릭하면 자동) · 학습·참고용이며 투자 권유가 아닙니다.'
+};
+</script>
+<script src="../xyz-shared/chart-core.js?v=6"></script>
+</body>
+</html>
