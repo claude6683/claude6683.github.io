@@ -98,6 +98,9 @@
     }
     fit();
     window.addEventListener('resize', fit);
+    window.addEventListener('load', fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+    setTimeout(fit, 600);
     window.addEventListener('orientationchange', fit);
     drag(bar);
   }
