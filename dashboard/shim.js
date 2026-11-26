@@ -1,44 +1,69 @@
-/* google.script.run 대체: Apps Script 의 JSON API(읽기 전용 허용 목록)를 fetch 로 호출.
-   직전 결과는 브라우저에 저장해 두었다가 먼저 보여주고(빠름), 새 결과가 다르면 한 번 더 호출. */
+/* google.script.run 대체: Apps Script 없이 dash.json(GitHub Actions 가 생성)에서 시세·시세표·뉴스를 읽어
+   기존 Apps Script 응답 모양(web_monitorData · web_getData · news_getData)으로 바꿔 준다.
+   직전 결과는 브라우저에 저장해 먼저 보여주고(빠름), 새 결과가 다르면 한 번 더 그린다. */
 (function () {
-  var BASE = 'https://script.google.com/macros/s/AKfycbxadwf6a-UyfC5wyIQ800rlRFw-yrVzVwUFNqML4mYmGILQ_LEI7EAfcx2qeKm8oTNZVg/exec';
-  var PFX = 'dash1_';
-  // 시세 응답에서 가격이 거의 비어 있으면(Apps Script 일시 오류) 불량으로 보고 저장/표시하지 않음
-  function good(fn, d) {
-    if (fn !== 'web_monitorData') return true;
-    var n = 0, it = (d && d.items) || [];
-    it.forEach(function (x) { if (typeof x.p === 'number') n++; });
-    return n >= 3;
-  }
-  function call(fn, args, ok, fail) {
-    var k = PFX + fn + '|' + args.join('|'), cs = null, hit = false;
-    try { cs = localStorage.getItem(k); } catch (e) {}
-    if (cs) { try { var c = JSON.parse(cs); if (good(fn, c)) { hit = true; if (ok) ok(c); } else { cs = null; } } catch (e) { console.error(e); } }
-    var q = 'api=' + encodeURIComponent(fn);
-    if (args[0] != null) q += '&a=' + encodeURIComponent(args[0]);
-    if (args[1] != null) q += '&b=' + encodeURIComponent(args[1]);
-    fetch(BASE + '?' + q).then(function (r) {
+  var URL0 = 'https://raw.githubusercontent.com/claude6683/claude6683.github.io/dash/dash.json';
+  var CK = 'dash2_json';
+  var pend = null, pat = 0;
+  var COLS = [110, 125, 105, 105, 105, 105, 105, 150, 135, 170].map(function (w) { return { w: w, hidden: false }; });
+  var HEAD = ['종목', '현재가격', '1일 가격변화', '1시간 가격변화', '1주가격변화', '1달가격변화', '전고점 가격변화', '1달 추이', '시세코드', '상태'];
+
+  function fetchText() {
+    var now = Date.now();
+    if (pend && now - pat < 30000) return pend;
+    pat = now;
+    pend = fetch(URL0 + '?t=' + Math.floor(now / 60000)).then(function (r) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       return r.text();
-    }).then(function (tx) {
-      var d = JSON.parse(tx);
-      if (!good(fn, d)) {   // 시트 시세가 비었으면 서버(dash.json)의 예비 시세로 대체
-        if (fn !== 'web_monitorData') throw new Error('bad data');
-        return fetch('https://raw.githubusercontent.com/claude6683/claude6683.github.io/dash/dash.json?t=' + Math.floor(Date.now() / 60000)).then(function (r) { return r.json(); }).then(function (j) {
-          var m = (j && j.mon) || [], have = {};
-          if (m.length < 3) throw new Error('bad data');
-          m.forEach(function (x) { have[x.t] = 1; });
-          var items = m.slice();
-          ((d && d.items) || []).forEach(function (x) { if (typeof x.p === 'number' && !have[x.t] && x.t !== 'KOSPI 야간') items.push(x); });
-          if (ok) ok({ at: d.at, items: items });
-        });
-      }
-      if (d && d.error && Object.keys(d).length === 1) throw new Error(d.error);
+    });
+    pend.catch(function () { pend = null; });
+    return pend;
+  }
+
+  function sheet(t) {
+    var blank = function () { var a = []; for (var i = 0; i < 10; i++) a.push({ t: '' }); return a; };
+    var r0 = blank(); r0[0] = { t: 'Trading View' };
+    var rows = [r0, blank(), HEAD.map(function (h) { return { t: h }; })];
+    (t.rows || []).forEach(function (x) {
+      rows.push([
+        { t: String(x.n) }, { t: String(x.p) }, { t: String(x.d) }, { t: String(x.h) }, { t: String(x.w) }, { t: String(x.m) }, { t: String(x.a) },
+        (x.s && x.s.length > 1) ? { t: '', s: x.s, sc: x.sc, sh: 34 } : { t: '' },
+        { t: String(x.code) }, { t: String(x.st) }
+      ]);
+    });
+    return { tabs: [{ label: 'Trading View', cols: COLS, rows: rows, hiddenRows: [], merges: [] }], at: t.at };
+  }
+
+  function build(fn, j) {
+    if (fn === 'web_monitorData') {
+      var m = j && j.monitor, n = 0;
+      ((m && m.items) || []).forEach(function (x) { if (typeof x.p === 'number') n++; });
+      if (n < 3) throw new Error('bad data');
+      return m;
+    }
+    if (fn === 'web_getData') {
+      if (!(j && j.tbl && j.tbl.rows && j.tbl.rows.length)) throw new Error('bad data');
+      return sheet(j.tbl);
+    }
+    if (fn === 'news_getData') {
+      if (!(j && j.flash && j.flash.list)) throw new Error('bad data');
+      return j.flash;
+    }
+    throw new Error('unsupported ' + fn);
+  }
+
+  function call(fn, args, ok, fail) {
+    var cs = null, hit = false;
+    try { cs = localStorage.getItem(CK); } catch (e) {}
+    if (cs) { try { var c = build(fn, JSON.parse(cs)); hit = true; if (ok) ok(c); } catch (e) { cs = null; } }
+    fetchText().then(function (tx) {
       if (tx === cs) return;
-      try { localStorage.setItem(k, tx); } catch (e) {}
+      var d = build(fn, JSON.parse(tx));
+      try { localStorage.setItem(CK, tx); } catch (e) {}
       if (ok) ok(d);
     }).catch(function (e) { if (!hit && fail) fail(e); });
   }
+
   function make(ok, fail) {
     return new Proxy({}, {
       get: function (_, name) {
