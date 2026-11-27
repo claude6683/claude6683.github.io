@@ -1,4 +1,4 @@
-/* #6683 공통 탭바 — 11개 페이지 어디서든 상단에서 이동 / 드래그로 순서 변경 (순서는 이 브라우저에 저장) */
+/* #6683 공통 탭바 — 12개 페이지 어디서든 상단에서 이동 / 드래그로 순서 변경 (순서는 이 브라우저에 저장) */
 (function () {
   if (window.__tabs6683) return;
   window.__tabs6683 = 1;
@@ -13,7 +13,8 @@
     ['/xyz100/', 'NASDAQ LIVE','NQ LIVE'],
     ['/kospi/', 'KOSPI LIVE','KS LIVE'],
     ['/nasdaq-alert/', 'NASDAQ ALERT','NQ ALERT'],
-    ['/kospi-alert/', 'KOSPI ALERT','KS ALERT']
+    ['/kospi-alert/', 'KOSPI ALERT','KS ALERT'],
+    ['/live/', 'Live Show','Live']
   ];
   var path = location.pathname.replace(/\/index\.html$/, '/');
   var page = ''; // 페이지별 겹침 보정용 이름
