@@ -74,6 +74,15 @@
   body.wide #chartView{display:flex}
   body.wide #back{display:none!important}
 
+  /* SMC 지표·그리기 도구 줄 */
+  .sbar{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;align-items:center;padding:4px 12px;border-bottom:1px solid var(--line);flex:none;-webkit-overflow-scrolling:touch}
+  .sbar .grp{flex:none}
+  .sbar button,.sbar select{font-size:.66rem;padding:3px 7px;white-space:nowrap;border-radius:6px;min-width:0;flex:none}
+  .sbar select{font-family:inherit;color:inherit;background:#1d2330;border:1px solid var(--line)}
+  .sbar .lbl{color:var(--sub);font-size:.625rem;white-space:nowrap;margin-left:4px;flex:none}
+  #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
+  #draw.act{pointer-events:auto;cursor:crosshair}
+
   /* 모바일: 목록 → 차트 전환 */
   body.chart #listView{display:none}
   body.chart #chartView{display:flex}
@@ -110,12 +119,15 @@
       </div>
       <div class="tools"></div>
     </div>
-    <div id="cwrap"><div id="chart"></div><div id="tip"></div><div id="lastp"></div><div id="cmsg"></div></div>
-    <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 가격축 위아래 드래그 = 세로 확대·축소, 더블클릭 초기화 · 상승 빨강 / 하락 파랑</div>
+    <div class="sbar" id="smcbar"><span class="lbl">SMC</span><button id="smcM">표시</button><div class="grp" id="smcopts"></div><span class="lbl">스윙길이</span><select id="swl"><option>10</option><option>20</option><option>50</option><option>100</option></select><span class="lbl">모드</span><div class="grp" id="smode"><button data-sm="hist">과거전체</button><button data-sm="pres">현재만</button></div></div>
+    <div class="sbar" id="drawbar"><span class="lbl">그리기</span><div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div></div>
+    <div id="cwrap"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div><div id="lastp"></div><div id="cmsg"></div></div>
+    <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 가격축 위아래 드래그 = 세로 확대·축소, 더블클릭 초기화 · 상승 빨강 / 하락 파랑<br>SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전입니다. 원본과 100% 같지 않을 수 있으며 투자 권유가 아닙니다.</div>
   </section>
 </div>
 
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="./smc-engine.js"></script>
 <script>
 // 야후 시세 중계 Worker 주소 (배포 후 여기에 넣음). 비어 있으면 공개 CORS 프록시로 대체 (느리고 불안정할 수 있음)
 window.LIVE_WORKER = window.LIVE_WORKER || 'https://live-quotes.nikemix99.workers.dev';
@@ -461,16 +473,23 @@ function initChart(){
     upColor:'#ef4444',downColor:'#3b82f6',borderVisible:false,wickUpColor:'#ef4444',wickDownColor:'#3b82f6',
     priceLineVisible:true,lastValueVisible:false,
   });
-  new ResizeObserver(()=>chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight})).observe($('chart'));
+  new ResizeObserver(()=>{ chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight}); sizeCv(); }).observe($('chart'));
   chart.subscribeCrosshairMove(onCross);
   $('chart').addEventListener('dblclick', resetView);
 }
 function yfmt(v){ const s=BY[curId]||{dec:2}; const d = Math.abs(v)>=1000?Math.min(s.dec,2):s.dec; return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 const tv = v => mode==='pct' ? (v/base-1)*100 : v;
-function toPt(b){ return {time:b.time+KST, open:tv(b.o), high:tv(b.h), low:tv(b.l), close:tv(b.c)}; }
+function toPt(b,i){
+  const p = {time:b.time+KST, open:tv(b.o), high:tv(b.h), low:tv(b.l), close:tv(b.c)};
+  if(smcOn && son.trend && smc && smc.trendBias.length){
+    const v = smc.trendBias[i==null?bars.length-1:i], t = v===undefined ? smc.trendBias[smc.trendBias.length-1] : v;
+    const c = t===1 ? UPC : DNC; p.color=c; p.borderColor=c; p.wickColor=c;
+  }
+  return p;
+}
 function render(){
   if(!series) return;
-  series.setData(bars.map(toPt));
+  series.setData(bars.map((b,i)=>toPt(b,i)));
   if(zeroLine){ series.removePriceLine(zeroLine); zeroLine=null; }
   zeroLine = series.createPriceLine({price: mode==='pct'?0:base, color:'#6b7280', lineWidth:1, lineStyle:2, axisLabelVisible:false, title:''});
 }
@@ -530,8 +549,8 @@ async function loadChart(keepView){
     bars = b; base = bars[bars.length-1].c;
     byTime = new Map(bars.map(x=>[x.time+KST,x]));
     $('cmsg').textContent = '';
-    render(); if(!keepView) resetView();
-  }catch(e){ if(my===loadSeq){ if(keepView && bars.length){ $('cmsg').textContent=''; return; } bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
+    recomputeSMC(); render(); if(!keepView) resetView();
+  }catch(e){ if(my===loadSeq){ if(keepView && bars.length){ $('cmsg').textContent=''; return; } bars=[]; smc=null; view=null; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
 }
 // 실시간 틱 → 마지막 봉 갱신
 function liveTick(id, p, tms){
@@ -543,23 +562,27 @@ function liveTick(id, p, tms){
   }else{
     last.c = p; if(p>last.h) last.h=p; if(p<last.l) last.l=p;
   }
-  const b = bars[bars.length-1]; series.update(toPt(b));
+  const b = bars[bars.length-1]; series.update(toPt(b, bars.length-1));
+  if(smcOn && !smcT) smcT = setTimeout(()=>{ smcT=0; recomputeSMC(); redrawSoon(); }, 1500);
 }
 function liveBar(id, d){ /* 하이퍼리퀴드 1분봉 수신은 liveTick 이 처리 */ }
 function onCross(p){
   const tip = $('tip');
   if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ tip.style.display='none'; return; }
   const b = byTime.get(p.time); if(!b){ tip.style.display='none'; return; }
-  const s = BY[curId], c = (b.c/base-1)*100;
-  const d = new Date(p.time*1000).toISOString();
+  showTip(b, p.time, p.point.x, p.point.y);
+}
+function showTip(b, t, x, y){
+  const tip = $('tip'), s = BY[curId], c = (b.c/base-1)*100;
+  const d = new Date(t*1000).toISOString();
   const day = tf==='d1';
   tip.innerHTML = '<div>'+d.slice(0,10)+(day?'':' '+d.slice(11,16))+'</div>'
     + '<div>가격 <b>'+fmt(s,b.c)+'</b></div>'
     + '<div>종가 대비 <b class="'+cls(c)+'">'+sgn(c)+'</b></div>';
   tip.style.display='block';
   const w = $('cwrap').clientWidth, tw = tip.offsetWidth;
-  tip.style.left = Math.min(Math.max(4,p.point.x+14), w-tw-80)+'px';
-  tip.style.top = Math.max(4,p.point.y-60)+'px';
+  tip.style.left = Math.min(Math.max(4,x+14), w-tw-80)+'px';
+  tip.style.top = Math.max(4,y-60)+'px';
 }
 function updateHead(){
   const s = BY[curId], q = st[curId]; if(!q||q.p==null) return;
@@ -567,12 +590,306 @@ function updateHead(){
   $('cprice').innerHTML = fmt(s,q.p)+(c==null?'':' <span class="'+cls(c)+'">'+sgn(c)+'</span>')+' <span style="font-size:12px;color:var(--sub)">'+hhmm(q.t)+'</span>';
 }
 
+// ---- SMC 지표 + 그리기 도구 (claude6683.github.io/smc 와 같은 엔진·도구, 색은 Live 규칙: 상승 빨강 / 하락 파랑) ----
+const SK = 'live-smc-v1', DK = 'live-draw-v1';
+const SOPTS = [
+  ['internal','내부구조',1],['swing','스윙구조',1],['iob','내부OB',1],['sob','스윙OB',0],
+  ['eq','EQH/EQL',1],['hl','강/약 고저',1],['fvg','FVG',0],['pd','프리미엄/디스카운트',0],
+  ['pts','스윙포인트',0],['trend','캔들색',0],['mD','일 고저',0],['mW','주 고저',0],['mM','월 고저',0],
+];
+const UPC='#ef4444', DNC='#3b82f6', GRAYC='#878b94', AMB='#f2b84b';
+const son = {}; SOPTS.forEach(o=>son[o[0]]=!!o[2]);
+let swingLen = 50, smode = 'hist', smcOn = true;
+try{
+  const j = JSON.parse(localStorage.getItem(SK)||'null');
+  if(j){
+    if(j.on && typeof j.on==='object') SOPTS.forEach(o=>{ if(typeof j.on[o[0]]==='boolean') son[o[0]]=j.on[o[0]]; });
+    if([10,20,50,100].indexOf(+j.sw)>=0) swingLen = +j.sw;
+    if(j.md==='pres') smode = 'pres';
+    if(j.m===false) smcOn = false;
+  }
+}catch(e){}
+function saveS(){ try{ localStorage.setItem(SK, JSON.stringify({on:son, sw:swingLen, md:smode, m:smcOn})); }catch(e){} }
+
+const cv = $('draw'), cx = cv.getContext('2d');
+let smc = null, view = null, smcT = 0;
+let tool = null, pend = null, hover = null, hitD = null, meas = null, cross = null, rdT = 0;
+let drawings = [];
+try{ const j = JSON.parse(localStorage.getItem(DK)||'[]'); if(Array.isArray(j)) drawings = j.filter(d=>d&&typeof d.k==='string'&&d.a&&isFinite(d.a.t)&&isFinite(d.a.p)&&(!d.b||(isFinite(d.b.t)&&isFinite(d.b.p)))); }catch(e){}
+function saveDraw(){ try{ localStorage.setItem(DK, JSON.stringify(drawings)); }catch(e){} }
+
+const TS = ()=>chart.timeScale();
+const X = i=>TS().logicalToCoordinate(i);
+const Y = p=>series.priceToCoordinate(tv(p));
+const unconv = v=> mode==='pct' ? base*(1+v/100) : v;
+const fmtV = v=> v>=1000 ? v.toLocaleString('en-US',{maximumFractionDigits:0}) : v>=1 ? v.toFixed(2) : v.toFixed(4);
+
+function lastBy(list, keyf){ const m=new Map(); list.forEach(x=>m.set(keyf(x),x)); return Array.from(m.values()); }
+function buildView(){
+  if(!smc){ view=null; return; }
+  const pres = smode==='pres';
+  view = {
+    structs: pres ? lastBy(smc.structs, s=>(s.internal?'i':'s')+(s.bull?'u':'d')) : smc.structs,
+    pts: pres ? lastBy(smc.swingPts, p=>p.low) : smc.swingPts,
+    eqs: pres ? lastBy(smc.eqs, e=>e.high) : smc.eqs,
+  };
+}
+function recomputeSMC(){
+  smc = null; view = null;
+  if(bars.length>=8 && typeof computeSMC==='function'){
+    try{ smc = computeSMC(bars.map(b=>({t:b.time,o:b.o,h:b.h,l:b.l,c:b.c})), {swingLen:swingLen, tfSec:STEP[tf]}); }catch(e){ smc = null; }
+  }
+  buildView();
+}
+function smcReset(){ smc=null; view=null; meas=null; pend=null; hover=null; hitD=null; tool=null; cross=null; syncSBtns(); redraw(); }
+
+function sizeCv(){ const w=$('chart').clientWidth, h=$('chart').clientHeight, d=window.devicePixelRatio||1; cv.width=Math.max(1,w*d); cv.height=Math.max(1,h*d); cv.style.width=w+'px'; cv.style.height=h+'px'; cx.setTransform(d,0,0,d,0,0); redraw(); }
+function plotSize(){ const W=$('chart').clientWidth, H=$('chart').clientHeight; let pw=76, th=28; try{ pw=chart.priceScale('right').width(); }catch(e){} try{ th=TS().height(); }catch(e){} return {W:W, H:H, pl:W-pw, pb:H-th}; }
+function hline(x1,x2,y,color,dash,w){ cx.beginPath(); cx.strokeStyle=color; cx.lineWidth=w||1; cx.setLineDash(dash||[]); cx.moveTo(x1,y); cx.lineTo(x2,y); cx.stroke(); cx.setLineDash([]); }
+function text(t,x,y,color,size,above,align){
+  cx.font=size+'px sans-serif'; cx.fillStyle=color; cx.textAlign=align||'center'; cx.textBaseline=above?'bottom':'top';
+  cx.fillText(t, x, above ? y-2 : y+2);
+}
+function redrawSoon(){ if(rdT) return; rdT=requestAnimationFrame(()=>{ rdT=0; redraw(); }); }
+function redraw(){
+  if(!chart || !series) return;
+  const L = plotSize(); cx.clearRect(0,0,L.W,L.H);
+  if(!curId || !bars.length) return;
+  if(!smcOn || !smc || !view){ drawUser(L); drawCross(L); return; }
+  const lr = TS().getVisibleLogicalRange(); if(!lr){ drawUser(L); return; }
+  const lo=lr.from-3, hi=lr.to+3, n=smc.n, last=n-1;
+  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
+
+  // 프리미엄 / 디스카운트 (프리미엄 = 매도 구간 파랑, 디스카운트 = 매수 구간 빨강)
+  if(son.pd && isFinite(smc.trailing.top)){
+    const t=smc.trailing, x1=X(t.idx), x2=X(last), top=t.top, bot=t.bottom;
+    if(x1!==null && x2!==null){
+      const zones=[[top,0.95*top+0.05*bot,DNC,'Premium',true],[0.525*top+0.475*bot,0.525*bot+0.475*top,GRAYC,'Equilibrium',null],[0.95*bot+0.05*top,bot,UPC,'Discount',false]];
+      zones.forEach(z=>{
+        const a=z[0], b=z[1], col=z[2], name=z[3], above=z[4], ya=Y(a), yb=Y(b); if(ya===null||yb===null) return;
+        cx.globalAlpha=.2; cx.fillStyle=col; cx.fillRect(x1,Math.min(ya,yb),x2-x1,Math.abs(yb-ya)); cx.globalAlpha=1;
+        if(above===null) text(name,x2-4,(ya+yb)/2-6,col,11,false,'right');
+        else text(name,(x1+x2)/2,above?ya:yb,col,11,above);
+      });
+    }
+  }
+  // 오더블록 (오른쪽으로 연장)
+  const drawOB=(list,max,internal)=>{
+    list.slice(0,max).forEach(ob=>{
+      const x1=X(ob.idx), y1=Y(ob.high), y2=Y(ob.low); if(x1===null||y1===null||y2===null) return;
+      const col = internal ? (ob.bias===-1?'rgba(59,130,246,.2)':'rgba(239,68,68,.2)') : (ob.bias===-1?'rgba(29,78,216,.22)':'rgba(185,28,28,.22)');
+      cx.fillStyle=col; cx.fillRect(x1,Math.min(y1,y2),L.pl-x1,Math.abs(y2-y1));
+      if(!internal){ cx.strokeStyle=col; cx.lineWidth=1; cx.strokeRect(x1,Math.min(y1,y2),L.pl-x1,Math.abs(y2-y1)); }
+    });
+  };
+  if(son.sob) drawOB(smc.swingOBs,5,false);
+  if(son.iob) drawOB(smc.internalOBs,5,true);
+  // FVG
+  if(son.fvg) smc.fvgs.forEach(f=>{
+    if(f.i2<lo||f.i1>hi) return;
+    const x1=X(f.i1), x2=X(f.i2), y1=Y(f.top), y2=Y(f.bottom); if(x1===null||x2===null||y1===null||y2===null) return;
+    cx.fillStyle = f.bias===1?'rgba(239,68,68,.3)':'rgba(59,130,246,.3)'; cx.fillRect(x1,Math.min(y1,y2),x2-x1,Math.abs(y2-y1));
+  });
+  // 구조 (BOS / CHoCH)
+  view.structs.forEach(s=>{
+    if(s.internal ? !son.internal : !son.swing) return;
+    if(s.i2<lo||s.i1>hi) return;
+    const x1=X(s.i1), x2=X(s.i2), y=Y(s.level), xm=X(s.mid); if(x1===null||x2===null||y===null||xm===null) return;
+    const col = s.bull?UPC:DNC;
+    hline(x1,x2,y,col,s.internal?[5,4]:[],1);
+    text(s.tag,xm,y,col,s.internal?9:11,s.bull);
+    { const sz=s.internal?6:9, d=s.bull?1:-1, ay=y+(s.bull?sz*2.2:-sz*2.2);
+      cx.beginPath(); cx.moveTo(x2,ay-d*sz*1.6); cx.lineTo(x2-sz,ay+d*sz*0.6); cx.lineTo(x2+sz,ay+d*sz*0.6); cx.closePath();
+      cx.save(); cx.globalAlpha=.22; cx.fillStyle=col; cx.fill();
+      if(s.tag==='CHoCH'){ cx.globalAlpha=.35; cx.strokeStyle='#fff'; cx.lineWidth=1; cx.stroke(); }
+      cx.restore(); }
+  });
+  // 동일 고점/저점
+  if(son.eq) view.eqs.forEach(e=>{
+    if(e.i2<lo||e.i1>hi) return;
+    const x1=X(e.i1), x2=X(e.i2), y1=Y(e.l1), y2=Y(e.l2), xm=X(e.mid); if(x1===null||x2===null||y1===null||y2===null||xm===null) return;
+    const col = e.high?DNC:UPC;
+    cx.beginPath(); cx.strokeStyle=col; cx.lineWidth=1; cx.setLineDash([1,3]); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke(); cx.setLineDash([]);
+    text(e.high?'EQH':'EQL',xm,y2,col,9,e.high);
+  });
+  // 스윙 포인트
+  if(son.pts) view.pts.forEach(p=>{
+    if(p.idx<lo||p.idx>hi) return; const x=X(p.idx), y=Y(p.price); if(x===null||y===null) return;
+    text(p.text,x,y,p.low?UPC:DNC,11,!p.low);
+  });
+  // 강/약 고저
+  if(son.hl && isFinite(smc.trailing.top)){
+    const t=smc.trailing, x2=X(last+20);
+    const top=Y(t.top), bot=Y(t.bottom), xt=X(t.lastTopIdx), xb=X(t.lastBottomIdx);
+    if(x2!==null){
+      const lx = Math.min(x2, L.pl-30);
+      if(top!==null&&xt!==null){ hline(xt,x2,top,DNC,[],1); text(smc.swingBias===-1?'Strong High':'Weak High',lx,top,DNC,9,true); }
+      if(bot!==null&&xb!==null){ hline(xb,x2,bot,UPC,[],1); text(smc.swingBias===1?'Strong Low':'Weak Low',lx,bot,UPC,9,false); }
+    }
+  }
+  // 전일/전주/전월 고저
+  ['D','W','M'].forEach(k=>{
+    if(!son['m'+k] || !smc.mtf[k]) return; const m=smc.mtf[k], x2=X(last+20); if(x2===null) return;
+    [[m.topIdx,m.top,'P'+k+'H'],[m.botIdx,m.bot,'P'+k+'L']].forEach(a=>{
+      const x1=X(a[0]), y=Y(a[1]); if(x1===null||y===null) return;
+      hline(x1,x2,y,AMB,[],1); text(a[2],Math.min(x2,L.pl-14),y,AMB,10,true,'right');
+    });
+  });
+  cx.restore();
+  drawUser(L); drawCross(L);
+}
+
+// ---------- 사용자 그리기 ----------
+function t2i(t){
+  const n=bars.length; if(!n) return null;
+  if(t<=bars[0].time) return (t-bars[0].time)/STEP[tf];
+  if(t>=bars[n-1].time) return n-1+(t-bars[n-1].time)/STEP[tf];
+  let lo=0, hi=n-1; while(hi-lo>1){ const m=(lo+hi)>>1; if(bars[m].time<=t) lo=m; else hi=m; }
+  return lo+(t-bars[lo].time)/(bars[hi].time-bars[lo].time);
+}
+function i2t(i){
+  const n=bars.length;
+  if(i<=0) return bars[0].time+i*STEP[tf]; if(i>=n-1) return bars[n-1].time+(i-(n-1))*STEP[tf];
+  const lo=Math.floor(i); return bars[lo].time+(i-lo)*(bars[lo+1].time-bars[lo].time);
+}
+function xy(o){ const i=t2i(o.t), x=i===null?null:X(i), y=series.priceToCoordinate(tv(o.p)); return (x===null||y===null)?null:{x:x,y:y}; }
+const FIB=[0,0.236,0.382,0.5,0.618,0.786,1];
+function drawOne(d,L,prev,hl){
+  const A=xy(d.a); if(!A) return;
+  cx.lineWidth=hl?2.5:1.5; cx.strokeStyle=hl?'#ef4444':'#4aa3ff'; cx.setLineDash(prev?[5,4]:[]); cx.font='11px sans-serif'; cx.fillStyle='#4aa3ff'; cx.textAlign='left'; cx.textBaseline='alphabetic';
+  if(d.type==='hline'){ cx.beginPath(); cx.moveTo(0,A.y); cx.lineTo(L.pl,A.y); cx.stroke(); cx.fillText(fmtV(d.a.p)+' ('+sgn((d.a.p/base-1)*100)+')',6,A.y-4); cx.setLineDash([]); return; }
+  if(d.type==='vline'){ cx.beginPath(); cx.moveTo(A.x,0); cx.lineTo(A.x,L.pb); cx.stroke(); cx.setLineDash([]); return; }
+  const B=d.b?xy(d.b):null; if(!B){ cx.setLineDash([]); return; }
+  if(d.type==='trend'){ cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); [A,B].forEach(q=>{ cx.beginPath(); cx.arc(q.x,q.y,3,0,6.3); cx.fill(); }); }
+  else if(d.type==='measure'){ cx.setLineDash([]); drawMeasure(d,A,B,L); return; }
+  else if(d.type==='rect'){ cx.fillStyle='rgba(74,163,255,.12)'; cx.fillRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); cx.strokeRect(Math.min(A.x,B.x),Math.min(A.y,B.y),Math.abs(B.x-A.x),Math.abs(B.y-A.y)); }
+  else if(d.type==='fib'){
+    const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x);
+    FIB.forEach(lv=>{
+      const pr=d.b.p+(d.a.p-d.b.p)*lv, y=series.priceToCoordinate(tv(pr)); if(y===null) return;
+      cx.globalAlpha=(lv===0||lv===1)?1:.75; cx.beginPath(); cx.moveTo(x1,y); cx.lineTo(x2,y); cx.stroke(); cx.globalAlpha=1;
+      cx.fillText((lv*100).toFixed(1)+'%  '+fmtV(pr),x1+4,y-3);
+    });
+    cx.setLineDash([3,4]); cx.globalAlpha=.5; cx.beginPath(); cx.moveTo(A.x,A.y); cx.lineTo(B.x,B.y); cx.stroke(); cx.globalAlpha=1;
+  }
+  cx.setLineDash([]);
+}
+function fmtDur(sec){ sec=Math.abs(sec); const d=Math.floor(sec/86400), h=Math.floor(sec%86400/3600), m=Math.floor(sec%3600/60); return d?d+'일 '+h+'시간':h?h+'시간 '+m+'분':m+'분'; }
+function drawMeasure(d,A,B,L){
+  const dp=d.b.p-d.a.p, pct=(d.b.p/d.a.p-1)*100, up=dp>=0, col=up?'#ef4444':'#3b82f6';
+  const nb=Math.round(t2i(d.b.t)-t2i(d.a.t));
+  const x1=Math.min(A.x,B.x), x2=Math.max(A.x,B.x), y1=Math.min(A.y,B.y), y2=Math.max(A.y,B.y), mx=(x1+x2)/2, my=(y1+y2)/2;
+  cx.fillStyle=up?'rgba(239,68,68,.15)':'rgba(59,130,246,.15)'; cx.fillRect(x1,y1,x2-x1,y2-y1);
+  cx.strokeStyle=col; cx.lineWidth=1; cx.setLineDash([]);
+  cx.beginPath(); cx.moveTo(x1,my); cx.lineTo(x2,my); cx.moveTo(mx,y1); cx.lineTo(mx,y2); cx.stroke();
+  const ah=(x,y,dx,dy)=>{ cx.beginPath(); cx.moveTo(x,y); cx.lineTo(x-dx*7-dy*4,y-dy*7+dx*4); cx.moveTo(x,y); cx.lineTo(x-dx*7+dy*4,y-dy*7-dx*4); cx.stroke(); };
+  ah(mx,B.y,0,B.y>=A.y?1:-1); ah(B.x,my,B.x>=A.x?1:-1,0);
+  const l1=(dp<0?'-':'+')+fmtV(Math.abs(dp))+' ('+sgn(pct)+')', l2=nb+'봉 · '+fmtDur(d.b.t-d.a.t);
+  cx.font='bold 11px sans-serif'; const w=Math.max(cx.measureText(l1).width,cx.measureText(l2).width)+16, h=36;
+  let bx=Math.min(Math.max(mx-w/2,4),L.pl-w-4), by=up?y1-h-6:y2+6; by=Math.min(Math.max(by,4),L.pb-h-4);
+  cx.fillStyle=up?'#7f1d1d':'#1e3a8a'; cx.strokeStyle=col; cx.fillRect(bx,by,w,h); cx.strokeRect(bx,by,w,h);
+  cx.fillStyle='#fff'; cx.textAlign='center'; cx.textBaseline='middle'; cx.fillText(l1,bx+w/2,by+11); cx.font='11px sans-serif'; cx.fillText(l2,bx+w/2,by+26);
+}
+function drawUser(L){
+  if(!bars.length) return;
+  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
+  drawings.forEach(d=>{ if(d.k===curId) drawOne(d,L,false,d===hitD); });
+  if(meas) drawOne({type:'measure',a:meas.a,b:meas.b},L,false,false);
+  if(pend&&hover) drawOne({type:pend.type,a:pend.a,b:hover},L,true,false);
+  else if(hover&&(tool==='hline'||tool==='vline')) drawOne({type:tool,a:hover},L,true,false);
+  cx.restore();
+}
+function evPos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left, y:e.clientY-r.top}; }
+function mkPt(pos){
+  if(!bars.length) return null; const L=plotSize(); if(pos.x>L.pl||pos.y>L.pb) return null;
+  const lg=TS().coordinateToLogical(pos.x), v=series.coordinateToPrice(pos.y); if(lg===null||v===null) return null;
+  return {t:i2t(lg), p:unconv(v)};
+}
+function segDist(p,a,b){ const dx=b.x-a.x, dy=b.y-a.y, l=dx*dx+dy*dy; let t=l?((p.x-a.x)*dx+(p.y-a.y)*dy)/l:0; t=Math.max(0,Math.min(1,t)); return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy)); }
+function hitTest(pos){
+  let best=null, bd=10;
+  drawings.forEach(d=>{
+    if(d.k!==curId) return; const A=xy(d.a), B=d.b?xy(d.b):null; if(!A) return; let dist=1e9;
+    if(d.type==='hline') dist=Math.abs(pos.y-A.y); else if(d.type==='vline') dist=Math.abs(pos.x-A.x);
+    else if(B&&d.type==='trend') dist=segDist(pos,A,B);
+    else if(B){ const x1=Math.min(A.x,B.x),x2=Math.max(A.x,B.x),y1=Math.min(A.y,B.y),y2=Math.max(A.y,B.y); if(pos.x>=x1-8&&pos.x<=x2+8&&pos.y>=y1-8&&pos.y<=y2+8) dist=0; }
+    if(dist<bd){ bd=dist; best=d; }
+  });
+  return best;
+}
+function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncSBtns(); redraw(); }
+function tipAtPos(pos){
+  const lg=TS().coordinateToLogical(pos.x), i=lg===null?-1:Math.round(lg);
+  if(i<0||i>=bars.length){ $('tip').style.display='none'; return; }
+  showTip(bars[i], bars[i].time+KST, pos.x, pos.y);
+}
+// 그리기 도구를 켠 동안에는 캔버스가 마우스를 받으므로 크로스헤어·툴팁을 직접 그린다
+function drawCross(L){
+  if(!tool || !cross) return;
+  const v=series.coordinateToPrice(cross.y); if(v===null||cross.y>L.pb||cross.y<0) return;
+  const price=unconv(v), pct=(price/base-1)*100;
+  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip(); cx.strokeStyle='rgba(139,147,167,.7)'; cx.lineWidth=1; cx.setLineDash([4,4]);
+  cx.beginPath(); cx.moveTo(0,cross.y); cx.lineTo(L.pl,cross.y); cx.moveTo(cross.x,0); cx.lineTo(cross.x,L.pb); cx.stroke(); cx.restore(); cx.setLineDash([]);
+  const t = mode==='pct' ? sgn(pct) : fmtV(price)+'  '+sgn(pct);
+  cx.font='bold 11px sans-serif'; const w=cx.measureText(t).width+12, x0=L.W-w;
+  cx.fillStyle = pct>=0 ? '#7f1d1d' : '#1e3a8a'; cx.fillRect(x0,cross.y-9,L.W-x0,18);
+  cx.fillStyle = pct>=0 ? '#fca5a5' : '#93c5fd'; cx.textAlign='left'; cx.textBaseline='middle'; cx.fillText(t,x0+6,cross.y+1);
+}
+function buildSMC(){
+  $('smcopts').innerHTML = SOPTS.map(o=>'<button data-o="'+o[0]+'">'+o[1]+'</button>').join('');
+  $('swl').value = String(swingLen);
+  syncSBtns();
+  cv.addEventListener('mousemove',e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); cross={x:pos.x,y:pos.y}; tipAtPos(pos); redrawSoon(); });
+  cv.addEventListener('mouseleave',()=>{ hover=null; hitD=null; cross=null; $('tip').style.display='none'; redrawSoon(); });
+  cv.addEventListener('wheel',e=>{   // 그리기 모드에서도 휠 줌 유지
+    e.preventDefault(); const pe=cv.style.pointerEvents; cv.style.pointerEvents='none';
+    const el=document.elementFromPoint(e.clientX,e.clientY); cv.style.pointerEvents=pe;
+    if(el) el.dispatchEvent(new WheelEvent('wheel',{clientX:e.clientX,clientY:e.clientY,deltaX:e.deltaX,deltaY:e.deltaY,deltaMode:e.deltaMode,bubbles:true,cancelable:true}));
+  },{passive:false});
+  cv.addEventListener('click',e=>{
+    const pos=evPos(e);
+    if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
+    const pt=mkPt(pos); if(!pt||!tool) return;
+    if(tool==='hline'||tool==='vline'){ drawings.push({k:curId,type:tool,a:pt}); finish(); return; }
+    if(!pend){ if(tool==='measure') meas=null; pend={type:tool,a:pt}; hover=pt; redraw(); return; }
+    if(pend.type==='measure'){ meas={a:pend.a,b:pt}; finish(); return; }
+    drawings.push({k:curId,type:pend.type,a:pend.a,b:pt}); finish();
+  });
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&(tool||pend||meas)){ meas=null; tool=null; pend=null; hover=null; syncSBtns(); redraw(); } });
+  $('dtools').addEventListener('click',e=>{ const bt=e.target.closest('button[data-d]'); const d=bt&&bt.dataset.d; if(!d) return; meas=null; tool=tool===d?null:d; pend=null; hover=null; hitD=null; syncSBtns(); redraw(); });
+  $('undo').onclick=()=>{ for(let i=drawings.length-1;i>=0;i--){ if(drawings[i].k===curId){ drawings.splice(i,1); break; } } saveDraw(); redraw(); };
+  $('clr').onclick=()=>{ drawings=drawings.filter(d=>d.k!==curId); saveDraw(); redraw(); };
+  $('smcM').onclick=()=>{ smcOn=!smcOn; saveS(); syncSBtns(); redraw(); };
+  $('smcopts').addEventListener('click',e=>{
+    const k=e.target.dataset.o; if(!k) return; son[k]=!son[k]; saveS(); syncSBtns();
+    if(k==='trend'){ render(); } redraw();
+  });
+  $('smode').addEventListener('click',e=>{ const m=e.target.dataset.sm; if(!m) return; smode=m; saveS(); syncSBtns(); buildView(); redraw(); });
+  $('swl').onchange=e=>{ swingLen=+e.target.value; saveS(); recomputeSMC(); redraw(); };
+  // 가격축 드래그 등으로 눈금이 바뀌면 오버레이를 다시 그린다
+  let sig='';
+  (function loop(){
+    requestAnimationFrame(loop);
+    if(!chart||!series||!curId) return;
+    const lr=TS().getVisibleLogicalRange();
+    const s=[lr?lr.from.toFixed(2)+','+lr.to.toFixed(2):'', series.priceToCoordinate(tv(base)), series.priceToCoordinate(tv(base*1.01)), $('chart').clientWidth, $('chart').clientHeight, bars.length, bars.length?bars[bars.length-1].c:0, mode, tf, curId].join('|');
+    if(s!==sig){ sig=s; redraw(); }
+  })();
+}
+function syncSBtns(){
+  $('smcM').classList.toggle('on',smcOn);
+  document.querySelectorAll('#smcopts button').forEach(b=>b.classList.toggle('on',!!son[b.dataset.o]));
+  document.querySelectorAll('#smode button').forEach(b=>b.classList.toggle('on',b.dataset.sm===smode));
+  document.querySelectorAll('#dtools button[data-d]').forEach(b=>b.classList.toggle('on',b.dataset.d===tool));
+  cv.classList.toggle('act',!!tool);
+}
+
 // ---- 화면 전환 ----
 function route(){
   let id=''; try{ id = decodeURIComponent(location.hash.slice(1)); }catch(e){}
   Object.values(rowEl).forEach(e=>e.classList.remove('sel'));
   if(id && BY[id] && rowEl[id] && !hidden.has(id)){
-    if(curId!==id){ bars=[]; byTime=new Map(); if(series) series.setData([]); $('cprice').textContent=''; }
+    if(curId!==id){ bars=[]; byTime=new Map(); if(series) series.setData([]); $('cprice').textContent=''; smcReset(); }
     curId = id; if(rowEl[id]) rowEl[id].classList.add('sel'); document.body.classList.add('chart');
     $('ctitle').textContent = (BY[id]&&BY[id].label)||id; updateHead();
     if(!chart) initChart();
@@ -583,7 +900,7 @@ function route(){
   }
 }
 function buildUI(){
-  buildRows(); buildTools(); buildAdd();
+  buildRows(); buildTools(); buildAdd(); buildSMC();
   const g = $('tfs');
   TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
     b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); loadChart(false); }; g.appendChild(b); });
