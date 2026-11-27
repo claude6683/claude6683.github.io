@@ -1,9 +1,10 @@
 // Cloudflare Worker: Live Show 시세 중계 (CORS 허용, 5초 캐시)
 //  GET /?q=NVDA,GOOGL,^KS11   -> 야후 시세 묶음 {SYM:{p,pc,t}}  (p=현재가, pc=전일 종가, t=마지막 체결 ms)
+//  GET /?s=nvidia             -> 야후 종목 검색 [{symbol,name,type,exch}] (최대 8개)
 //  GET /?u=<url>              -> 허용된 거래소/야후 주소를 대신 받아 전달 (브라우저 CORS 우회)
 const ALLOW = new Set([
   "query1.finance.yahoo.com", "query2.finance.yahoo.com",
-  "api.upbit.com", "api.binance.com", "api.hyperliquid.xyz",
+  "api.upbit.com", "api.binance.com", "api.hyperliquid.xyz", "api.backpack.exchange",
 ]);
 const UA = { "user-agent": "Mozilla/5.0 (compatible; LiveShow/1.0)" };
 
@@ -41,6 +42,18 @@ export default {
     if (req.method === "OPTIONS") return new Response(null, { headers: cors });
     const url = new URL(req.url);
     try {
+      const sq = (url.searchParams.get("s") || "").trim().slice(0, 40);
+      if (sq) {
+        const r = await fetch("https://query2.finance.yahoo.com/v1/finance/search?newsCount=0&quotesCount=8&lang=en-US&q=" + encodeURIComponent(sq),
+          { headers: UA, cf: { cacheTtl: 60, cacheEverything: true } });
+        const j = r.ok ? await r.json() : {};
+        const ok = new Set(["EQUITY", "ETF", "INDEX", "FUTURE", "CURRENCY", "CRYPTOCURRENCY", "MUTUALFUND"]);
+        const out = ((j && j.quotes) || []).filter(x => x.symbol && ok.has(x.quoteType))
+          .map(x => ({ symbol: x.symbol, name: x.shortname || x.longname || "", type: x.quoteType, exch: x.exchDisp || x.exchange || "" }));
+        return new Response(JSON.stringify(out), {
+          headers: { ...cors, "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=60" },
+        });
+      }
       const q = url.searchParams.get("q");
       if (q) {
         const syms = q.split(",").map(s => s.trim()).filter(Boolean).slice(0, 40);

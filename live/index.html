@@ -63,6 +63,12 @@
   #restore button{margin:3px 4px 0 0;padding:2px 8px}
   #editHint{display:none;font-size:.75rem;color:var(--sub)}
   body.edit #editHint{display:inline}
+  #addPanel{display:none;flex:none;padding:8px 14px;border-bottom:1px solid var(--line)}
+  #addPanel.open{display:block}
+  #addQ{width:100%;font:inherit;color:inherit;background:#0f1319;border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+  #addRes{font-size:.8125rem;color:var(--sub);max-height:14rem;overflow:auto;margin-top:6px}
+  #addRes .sr{display:block;width:100%;text-align:left;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
+  .row .pr{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   body.wide #listView{display:none!important}
   body.wide #chartView{display:flex}
   body.wide #back{display:none!important}
@@ -84,7 +90,8 @@
 <div id="app">
   <section id="listView">
     <header><h1>Live Show</h1><span id="conn"></span></header>
-    <div id="toolbar"><div class="tools"></div><button id="editBtn">편집</button><span id="editHint">⋮⋮ 끌어서 순서 변경 · ✕ 삭제</span></div>
+    <div id="toolbar"><div class="tools"></div><button id="addBtn">＋ 추가</button><button id="editBtn">편집</button><span id="editHint">⋮⋮ 끌어서 순서 변경 · ✕ 삭제</span></div>
+    <div id="addPanel"><input id="addQ" placeholder="종목 검색 (예: nvidia, 삼성전자) 또는 티커 입력 후 Enter" autocomplete="off" autocapitalize="off" spellcheck="false"><div id="addRes"></div></div>
     <div class="cols"><span></span><span>심볼</span><span>현재가</span><span>변동%</span><span>갱신</span></div>
     <div id="rows"></div>
     <div id="restore"></div>
@@ -131,7 +138,7 @@ const SYMS = [
   {id:'NAS100',   src:'yf', k:'NQ=F',     dec:2},
   {id:'KOSPI',    src:'yf', k:'^KS11',    dec:2},
   {id:'GOOGL',    src:'yf', k:'GOOGL',    dec:2},
-  {id:'BPUSDT',   src:'bn', k:'BPUSDT',   dec:4},
+  {id:'BPUSDT',  src:'bp', k:'BP_USDC', dec:4},
   {id:'GOLD',     src:'yf', k:'GC=F',     dec:2},
   {id:'QQQM',     src:'yf', k:'QQQM',     dec:2},
   {id:'SCHG',     src:'yf', k:'SCHG',     dec:2},
@@ -143,9 +150,14 @@ const SYMS = [
   {id:'EWY',      src:'yf', k:'EWY',      dec:2},
   {id:'NVDA',     src:'yf', k:'NVDA',     dec:2},
 ];
+// 직접 추가한 종목 (브라우저에 저장)
+const CK = 'live-custom-v1';
+function loadCustom(){ try{ const a=JSON.parse(localStorage.getItem(CK)||'[]'); return (Array.isArray(a)?a:[]).filter(c=>c&&typeof c.k==='string'&&/^[\w.^=\-]{1,24}$/.test(c.k)); }catch(e){ return []; } }
+function saveCustom(){ try{ localStorage.setItem(CK, JSON.stringify(SYMS.filter(x=>x.custom).map(x=>({k:x.k,dec:x.dec,name:x.name||''})))); }catch(e){} }
+loadCustom().forEach(c=>{ if(!SYMS.some(x=>x.id===c.k)) SYMS.push({id:c.k, src:'yf', k:c.k, dec:+c.dec||0, name:String(c.name||''), custom:true}); });
 const BY = {}; SYMS.forEach(s=>BY[s.id]=s);
 const st = {};          // id -> {p, pc, t(ms)}
-const feedAt = {bn:0, up:0, hl:0, yf:0};
+const feedAt = {bn:0, up:0, hl:0, yf:0, bp:0};
 const $ = id => document.getElementById(id);
 
 // ---- 공통 ----
@@ -190,17 +202,21 @@ function flush(){
 // ---- 목록 ----
 const rowEl = {};
 function buildRows(){
+  SYMS.forEach(addRow);
+  applyLayout();
+}
+function addRow(s){
   const box = $('rows');
-  SYMS.forEach(s=>{
+  {
     const d = document.createElement('div'); d.className='row'; d.dataset.id=s.id;
-    d.innerHTML = '<span class="hd" title="끌어서 이동"><span class="g">⋮⋮</span><button class="x" title="삭제">✕</button></span><span class="nm">'+s.id+'</span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
+    d.innerHTML = '<span class="hd" title="끌어서 이동"><span class="g">⋮⋮</span><button class="x" title="삭제">✕</button></span><span class="nm"></span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
+    d.querySelector('.nm').textContent = s.id; if(s.name) d.querySelector('.nm').title = s.name;
     d.onclick = ()=>{ if(document.body.classList.contains('edit')) return; location.hash = '#'+s.id; };
     d.querySelector('.x').onclick = e=>{ e.stopPropagation(); hideSym(s.id); };
     d.querySelector('.hd').addEventListener('pointerdown', e=>dragStart(e,d));
     d.querySelector('.hd').addEventListener('click', e=>e.stopPropagation());
     box.appendChild(d); rowEl[s.id] = d;
-  });
-  applyLayout();
+  }
 }
 // ---- 목록 편집: 순서·삭제 저장 ----
 const LK = 'live-layout-v1';
@@ -212,12 +228,17 @@ function saveLayout(){
 }
 function applyLayout(){
   const L = loadLayout(), box = $('rows');
-  hidden = new Set((L.hidden||[]).filter(id=>BY[id]));
-  (L.order||[]).forEach(id=>{ if(rowEl[id]) box.appendChild(rowEl[id]); });   // 저장된 순서대로, 새 종목은 뒤에 남음
+  hidden = new Set((Array.isArray(L.hidden)?L.hidden:[]).filter(id=>BY[id]));
+  (Array.isArray(L.order)?L.order:[]).forEach(id=>{ if(rowEl[id]) box.appendChild(rowEl[id]); });   // 저장된 순서대로, 새 종목은 뒤에 남음
   SYMS.forEach(s=>rowEl[s.id].classList.toggle('gone', hidden.has(s.id)));
   drawRestore();
 }
-function hideSym(id){ hidden.add(id); rowEl[id].classList.add('gone'); saveLayout(); drawRestore(); if(curId===id){ location.hash=''; } }
+function removeCustom(id){
+  const i = SYMS.findIndex(x=>x.id===id); if(i>=0) SYMS.splice(i,1); delete BY[id];
+  if(rowEl[id]){ rowEl[id].remove(); delete rowEl[id]; } delete st[id];
+  saveCustom(); saveLayout(); if(curId===id) location.hash='';
+}
+function hideSym(id){ if(BY[id]&&BY[id].custom){ removeCustom(id); return; } hidden.add(id); rowEl[id].classList.add('gone'); saveLayout(); drawRestore(); if(curId===id){ location.hash=''; } }
 function showSym(id){ hidden.delete(id); rowEl[id].classList.remove('gone'); $('rows').appendChild(rowEl[id]); saveLayout(); drawRestore(); }
 function drawRestore(){
   const r = $('restore'); r.innerHTML='';
@@ -271,6 +292,37 @@ function toggleFull(){
   setTimeout(syncFullBtn,200);
 }
 function syncFullBtn(){ const on = !!fsEl() || document.body.classList.contains('wide'); document.querySelectorAll('.fsx').forEach(b=>b.textContent = on?'⤡':'⤢'); }
+// ---- 종목 추가: 검색(Worker) 또는 티커 직접 입력 ----
+function addSym(k, name){
+  k = String(k||'').trim();
+  if(!/^[\w.^=\-]{1,24}$/.test(k)) return false;
+  if(BY[k]){ if(hidden.has(k)) showSym(k); location.hash = '#'+k; return true; }
+  const dec = /\.(KS|KQ)$/i.test(k) ? 0 : 2;
+  const o = {id:k, src:'yf', k, dec, name:String(name||''), custom:true};
+  SYMS.push(o); BY[k]=o; addRow(o); saveCustom(); saveLayout(); pollYahoo(); location.hash = '#'+k; return true;
+}
+let sT = 0, sSeq = 0;
+async function doSearch(q){
+  const box = $('addRes'), my = ++sSeq;
+  if(!q){ box.textContent=''; return; }
+  if(!WORKER){ box.textContent = '검색은 Worker 배포 후 가능해요. 지금은 티커를 직접 입력하고 Enter (예: AMD, 005930.KS)'; return; }
+  box.textContent = '검색 중…';
+  try{
+    const j = await getJSON(WORKER+'/?s='+encodeURIComponent(q));
+    if(my!==sSeq) return;
+    box.textContent = '';
+    if(!Array.isArray(j)||!j.length){ box.textContent = '결과 없음 — 티커를 직접 입력하고 Enter'; return; }
+    j.forEach(x=>{ const b=document.createElement('button'); b.className='sr';
+      b.textContent = x.symbol+'  '+(x.name||'')+'  · '+(x.type||'')+(x.exch?' · '+x.exch:'');
+      b.onclick = ()=>{ if(addSym(x.symbol, x.name)){ $('addQ').value=''; box.textContent=''; $('addPanel').classList.remove('open'); } };
+      box.appendChild(b); });
+  }catch(e){ if(my===sSeq) box.textContent = '검색 실패 — 티커를 직접 입력하고 Enter'; }
+}
+function buildAdd(){
+  $('addBtn').onclick = ()=>{ const p=$('addPanel'); p.classList.toggle('open'); if(p.classList.contains('open')) $('addQ').focus(); };
+  $('addQ').addEventListener('input', ()=>{ clearTimeout(sT); const q=$('addQ').value.trim(); sT=setTimeout(()=>doSearch(q), 350); });
+  $('addQ').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const q=$('addQ').value.trim().toUpperCase(); if(addSym(q)){ $('addQ').value=''; $('addRes').textContent=''; $('addPanel').classList.remove('open'); } else $('addRes').textContent='티커 형식이 아니에요 (영문·숫자·.^=- 만)'; } });
+}
 function buildTools(){
   document.querySelectorAll('.tools').forEach(box=>{
     box.innerHTML = '<button class="fsm" title="글자 작게">A−</button><button class="fsp" title="글자 크게">A+</button><button class="fsx" title="화면 최대화">⤢</button>';
@@ -283,7 +335,7 @@ function buildTools(){
   applyFS();
 }
 function updateRow(id){
-  const s = BY[id], q = st[id], el = rowEl[id]; if(!q) return;
+  const s = BY[id], q = st[id], el = rowEl[id]; if(!q||!el||q.p==null) return;
   const pr = el.children[2], ch = el.children[3];
   const old = pr.textContent, nw = fmt(s,q.p);
   pr.textContent = nw;
@@ -294,7 +346,7 @@ function updateRow(id){
 function updateConn(){
   const now = Date.now();
   const dot = (k,label,lim)=>'<i style="color:'+((now-feedAt[k])<lim?'#22c55e':'#6b7280')+'">●</i> '+label;
-  $('conn').innerHTML = dot('bn','바이낸스',20000)+'  '+dot('up','업비트',20000)+'  '+dot('hl','HL',60000)+'  '+dot('yf','주식',45000);
+  $('conn').innerHTML = dot('bn','바이낸스',20000)+'  '+dot('up','업비트',20000)+'  '+dot('hl','HL',60000)+'  '+dot('bp','백팩',60000)+'  '+dot('yf','주식',45000);
 }
 
 // ---- 실시간: 바이낸스 / 업비트 / 하이퍼리퀴드 (웹소켓, 브라우저 직결) ----
@@ -337,6 +389,17 @@ function wsHyper(){
     w.onopen = ()=>w.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:s.k,interval:'1m'}}));
     w.onmessage = e=>{ const j=JSON.parse(e.data); if(j.channel!=='candle'||!j.data) return;
       feedAt.hl=Date.now(); setQuote(s.id, +j.data.c, null, Date.now()); liveBar(s.id, j.data); };
+    return w;
+  });
+}
+
+function wsBackpack(){
+  const list = SYMS.filter(s=>s.src==='bp'); if(!list.length) return; const map={}; list.forEach(s=>map[s.k]=s);
+  connect(()=>{
+    const w = new WebSocket('wss://ws.backpack.exchange');
+    w.onopen = ()=>w.send(JSON.stringify({method:'SUBSCRIBE',params:list.map(s=>'ticker.'+s.k)}));
+    w.onmessage = e=>{ let m; try{ m=JSON.parse(e.data).data; }catch(_){ return; } if(!m||!map[m.s]) return;
+      feedAt.bp=Date.now(); setQuote(map[m.s].id, +m.c, +m.o, Math.floor(m.E/1000)); };
     return w;
   });
 }
@@ -422,6 +485,10 @@ async function fetchBars(s, tfk){
     const j = await getJSON('https://api.upbit.com/v1/candles/'+u+'?market='+s.k+'&count=200');
     return j.map(x=>({time:Math.floor(Date.parse(x.candle_date_time_utc+'Z')/1000),o:x.opening_price,h:x.high_price,l:x.low_price,c:x.trade_price})).reverse();
   }
+  if(s.src==='bp'){
+    const j = await getJSON('https://api.backpack.exchange/api/v1/klines?symbol='+s.k+'&interval='+iv+'&startTime='+(Math.floor(Date.now()/1000)-500*STEP[tfk]));
+    return j.map(x=>({time:Math.floor(Date.parse(x.start.replace(' ','T')+'Z')/1000),o:+x.open,h:+x.high,l:+x.low,c:+x.close}));
+  }
   if(s.src==='hl'){
     const now = Date.now();
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
@@ -445,7 +512,7 @@ async function loadChart(keepView){
     byTime = new Map(bars.map(x=>[x.time+KST,x]));
     $('cmsg').textContent = '';
     render(); if(!keepView) resetView();
-  }catch(e){ if(my===loadSeq){ bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
+  }catch(e){ if(my===loadSeq){ if(keepView && bars.length) return; bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
 }
 // 실시간 틱 → 마지막 봉 갱신
 function liveTick(id, p, tms){
@@ -476,14 +543,14 @@ function onCross(p){
   tip.style.top = Math.max(4,p.point.y-60)+'px';
 }
 function updateHead(){
-  const s = BY[curId], q = st[curId]; if(!q) return;
+  const s = BY[curId], q = st[curId]; if(!q||q.p==null) return;
   const c = q.pc ? (q.p/q.pc-1)*100 : null;
   $('cprice').innerHTML = fmt(s,q.p)+(c==null?'':' <span class="'+cls(c)+'">'+sgn(c)+'</span>')+' <span style="font-size:12px;color:var(--sub)">'+hhmm(q.t)+'</span>';
 }
 
 // ---- 화면 전환 ----
 function route(){
-  const id = decodeURIComponent(location.hash.slice(1));
+  let id=''; try{ id = decodeURIComponent(location.hash.slice(1)); }catch(e){}
   Object.values(rowEl).forEach(e=>e.classList.remove('sel'));
   if(id && BY[id] && !hidden.has(id)){
     curId = id; rowEl[id].classList.add('sel'); document.body.classList.add('chart');
@@ -496,7 +563,7 @@ function route(){
   }
 }
 function buildUI(){
-  buildRows(); buildTools();
+  buildRows(); buildTools(); buildAdd();
   const g = $('tfs');
   TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
     b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); loadChart(false); }; g.appendChild(b); });
@@ -508,9 +575,10 @@ function buildUI(){
 }
 
 buildUI();
-wsBinance(); wsUpbit(); wsHyper();
+wsBinance(); wsUpbit(); wsHyper(); wsBackpack();
 pollYahoo(); setInterval(pollYahoo, YAHOO_POLL_MS);
 setInterval(updateConn, 1000); updateConn();
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ pollYahoo(); if(curId) loadChart(true); } });
 setInterval(()=>{ if(curId) loadChart(true); }, 300000);   // 5분마다 봉 전체 새로고침(기준 종가 재설정)
 route();
 })();
