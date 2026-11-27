@@ -77,6 +77,7 @@
   /* SMC 지표·그리기 도구 줄 */
   .sbar{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:4px;align-items:center;padding:4px 12px;border-bottom:1px solid var(--line);flex:none;-webkit-overflow-scrolling:touch}
   .sbar .grp{flex:none}
+  .cbar button{font-size:.66rem;padding:3px 7px;border-radius:6px;min-width:0}
   .sbar button,.sbar select{font-size:.66rem;padding:3px 7px;white-space:nowrap;border-radius:6px;min-width:0;flex:none}
   .sbar select{font-family:inherit;color:inherit;background:#1d2330;border:1px solid var(--line)}
   .sbar .lbl{color:var(--sub);font-size:.625rem;white-space:nowrap;margin-left:4px;flex:none}
@@ -604,8 +605,7 @@ function updateHead(){
 const SK = 'live-smc-v1', DK = 'live-draw-v1';
 const SOPTS = [
   ['internal','내부구조',1],['swing','스윙구조',1],['iob','내부OB',1],['sob','스윙OB',0],
-  ['eq','EQH/EQL',1],['hl','강/약 고저',1],['fvg','FVG',0],['pd','프리미엄/디스카운트',0],
-  ['pts','스윙포인트',0],['trend','캔들색',0],['mD','일 고저',0],['mW','주 고저',0],['mM','월 고저',0],
+  ['eq','EQH/EQL',1],['hl','강/약 고저',1],['fvg','FVG',0],
 ];
 const UPC='#ef4444', DNC='#3b82f6', GRAYC='#878b94', AMB='#f2b84b';
 const son = {}; SOPTS.forEach(o=>son[o[0]]=!!o[2]);
