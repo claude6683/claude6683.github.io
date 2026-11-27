@@ -7,6 +7,7 @@
 <style>
   :root{--bg:#0f1115;--card:#161a21;--line:#262c37;--tx:#e8eaf0;--sub:#8b93a7;--up:#ef4444;--dn:#3b82f6;--ac:#f2b84b}
   *{box-sizing:border-box}
+  html{font-size:16px}
   html,body{height:100%;margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Malgun Gothic","Noto Sans KR",sans-serif;-webkit-text-size-adjust:100%}
   #app{display:flex;height:100%;overflow:hidden}
   button{font:inherit;color:inherit;background:#1d2330;border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer}
@@ -16,35 +17,55 @@
 
   /* 목록 */
   #listView{width:100%;display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0}
-  #listView header{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);flex:none}
-  h1{font-size:18px;margin:0}
-  #conn{margin-left:auto;font-size:12px;color:var(--sub);white-space:nowrap}
+  #listView header{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px;padding:10px 14px;border-bottom:1px solid var(--line);flex:none}
+  h1{font-size:1.125rem;margin:0}
+  #conn{margin-left:auto;font-size:.75rem;color:var(--sub);white-space:nowrap}
   #conn i{font-style:normal}
-  .cols,.row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,.9fr) 46px;gap:8px;align-items:center;padding:0 14px}
-  .cols{height:28px;font-size:12px;color:var(--sub);border-bottom:1px solid var(--line);flex:none}
-  .cols span:nth-child(n+2),.row span:nth-child(n+2){text-align:right}
+  .cols,.row{display:grid;grid-template-columns:1.5rem minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,.9fr) 3rem;gap:8px;align-items:center;padding:0 14px}
+  body.edit .cols,body.edit .row{grid-template-columns:3.6rem minmax(0,1.5fr) minmax(0,1.3fr) minmax(0,.9fr) 3rem}
+  .cols{height:1.75rem;font-size:.75rem;color:var(--sub);border-bottom:1px solid var(--line);flex:none}
+  .cols span:nth-child(n+3),.row>span:nth-child(n+3){text-align:right}
   #rows{overflow-y:auto;flex:1;-webkit-overflow-scrolling:touch}
-  .row{height:44px;border-bottom:1px solid #1a1f29;cursor:pointer;font-variant-numeric:tabular-nums}
+  .row{height:2.75rem;border-bottom:1px solid #1a1f29;cursor:pointer;font-variant-numeric:tabular-nums}
   .row:hover{background:#171c25}
   .row.sel{background:#1c2230}
   .row .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .row .tm{font-size:12px;color:var(--sub)}
+  .row .tm{font-size:.75rem;color:var(--sub)}
   .row .pr.flash{background:rgba(242,184,75,.18)}
   .row .pr{border-radius:4px;transition:background .6s}
 
   /* 차트 */
   #chartView{display:none;flex-direction:column;min-width:0;flex:1}
   .cbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
-  .cbar .tt{font-weight:700;font-size:16px}
-  .cbar .cp{font-variant-numeric:tabular-nums;font-size:16px}
+  .cbar .tt{font-weight:700;font-size:1rem}
+  .cbar .cp{font-variant-numeric:tabular-nums;font-size:1rem}
   .cbar .sp{flex:1}
   .grp{display:flex;gap:4px}
   #cwrap{position:relative;flex:1;min-height:0}
   #chart{position:absolute;inset:0}
-  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(22,26,33,.95);border:1px solid #3a4254;border-radius:6px;padding:6px 9px;font-size:12px;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
-  #cmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--sub);font-size:14px;pointer-events:none}
-  #cnote{flex:none;padding:6px 12px;border-top:1px solid var(--line);font-size:11px;color:var(--sub)}
+  #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(22,26,33,.95);border:1px solid #3a4254;border-radius:6px;padding:6px 9px;font-size:.75rem;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
+  #cmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--sub);font-size:.875rem;pointer-events:none}
+  #cnote{flex:none;padding:6px 12px;border-top:1px solid var(--line);font-size:.6875rem;color:var(--sub)}
   #back{display:none}
+
+  /* 도구줄 / 편집 */
+  #toolbar{display:flex;align-items:center;gap:6px;padding:6px 14px;border-bottom:1px solid var(--line);flex:none;flex-wrap:wrap}
+  .tools{display:flex;gap:4px}
+  .tools button,#toolbar button{padding:3px 9px;min-width:2rem}
+  .hd{touch-action:none;cursor:grab;color:#5b6475;text-align:center;user-select:none;-webkit-user-select:none;font-size:1rem;line-height:2.75rem;letter-spacing:-2px}
+  .hd .x{display:none}
+  body.edit .hd{display:flex;align-items:center;gap:4px;letter-spacing:0}
+  body.edit .hd .x{display:inline-block;padding:1px 7px;color:#fff;background:#7f1d1d;border-color:#7f1d1d;line-height:1.3}
+  .row.drag{background:#222a3a;box-shadow:0 2px 10px rgba(0,0,0,.5);position:relative;z-index:3;opacity:.95}
+  .row.gone{display:none}
+  #restore{display:none;flex:none;padding:8px 14px;border-top:1px solid var(--line);font-size:.8125rem;color:var(--sub);max-height:30%;overflow:auto}
+  body.edit #restore.has{display:block}
+  #restore button{margin:3px 4px 0 0;padding:2px 8px}
+  #editHint{display:none;font-size:.75rem;color:var(--sub)}
+  body.edit #editHint{display:inline}
+  body.wide #listView{display:none!important}
+  body.wide #chartView{display:flex}
+  body.wide #back{display:none!important}
 
   /* 모바일: 목록 → 차트 전환 */
   body.chart #listView{display:none}
@@ -52,7 +73,7 @@
   body.chart #back{display:inline-block}
   /* 넓은 화면: 목록 + 차트 나란히 */
   @media(min-width:900px){
-    #listView{width:380px;flex:none}
+    #listView{width:24rem;max-width:45vw;flex:none}
     #chartView{display:flex}
     body.chart #listView{display:flex}
     #back{display:none!important}
@@ -63,8 +84,10 @@
 <div id="app">
   <section id="listView">
     <header><h1>Live Show</h1><span id="conn"></span></header>
-    <div class="cols"><span>심볼</span><span>현재가</span><span>변동%</span><span>갱신</span></div>
+    <div id="toolbar"><div class="tools"></div><button id="editBtn">편집</button><span id="editHint">⋮⋮ 끌어서 순서 변경 · ✕ 삭제</span></div>
+    <div class="cols"><span></span><span>심볼</span><span>현재가</span><span>변동%</span><span>갱신</span></div>
     <div id="rows"></div>
+    <div id="restore"></div>
   </section>
   <section id="chartView">
     <div class="cbar">
@@ -77,6 +100,7 @@
         <button data-m="pct" class="on">%</button><button data-m="price">가격</button>
         <button id="reset">초기화</button>
       </div>
+      <div class="tools"></div>
     </div>
     <div id="cwrap"><div id="chart"></div><div id="tip"></div><div id="cmsg"></div></div>
     <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 더블클릭 초기화 · 상승 빨강 / 하락 파랑</div>
@@ -136,9 +160,10 @@ async function getJSON(url, opt){
   tries.push('https://corsproxy.io/?'+encodeURIComponent(url), 'https://api.allorigins.win/raw?url='+encodeURIComponent(url));
   let err;
   for(const u of tries){
-    const t = timeout(8000);
+    const t = timeout(12000);
     try{
-      const r = await fetch(u, Object.assign({signal:t.signal}, opt||{}));
+      let r = await fetch(u, Object.assign({signal:t.signal}, opt||{}));
+      for(let k=0; r.status===429 && k<3; k++){ await new Promise(z=>setTimeout(z, 700*(k+1)+Math.random()*400)); r = await fetch(u, Object.assign({signal:t.signal}, opt||{})); }   // 업비트 요청 과다(429): 잠깐 쉬고 재시도
       if(!r.ok) throw new Error('http '+r.status);
       const j = await r.json(); t.done(); return j;
     }catch(e){ t.done(); err = e; }
@@ -168,19 +193,103 @@ function buildRows(){
   const box = $('rows');
   SYMS.forEach(s=>{
     const d = document.createElement('div'); d.className='row'; d.dataset.id=s.id;
-    d.innerHTML = '<span class="nm">'+s.id+'</span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
-    d.onclick = ()=>{ location.hash = '#'+s.id; };
+    d.innerHTML = '<span class="hd" title="끌어서 이동"><span class="g">⋮⋮</span><button class="x" title="삭제">✕</button></span><span class="nm">'+s.id+'</span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
+    d.onclick = ()=>{ if(document.body.classList.contains('edit')) return; location.hash = '#'+s.id; };
+    d.querySelector('.x').onclick = e=>{ e.stopPropagation(); hideSym(s.id); };
+    d.querySelector('.hd').addEventListener('pointerdown', e=>dragStart(e,d));
+    d.querySelector('.hd').addEventListener('click', e=>e.stopPropagation());
     box.appendChild(d); rowEl[s.id] = d;
   });
+  applyLayout();
+}
+// ---- 목록 편집: 순서·삭제 저장 ----
+const LK = 'live-layout-v1';
+let hidden = new Set();
+function loadLayout(){ try{ return JSON.parse(localStorage.getItem(LK)||'null')||{}; }catch(e){ return {}; } }
+function saveLayout(){
+  const order = Array.from($('rows').children).map(e=>e.dataset.id);
+  try{ localStorage.setItem(LK, JSON.stringify({order, hidden:Array.from(hidden)})); }catch(e){}
+}
+function applyLayout(){
+  const L = loadLayout(), box = $('rows');
+  hidden = new Set((L.hidden||[]).filter(id=>BY[id]));
+  (L.order||[]).forEach(id=>{ if(rowEl[id]) box.appendChild(rowEl[id]); });   // 저장된 순서대로, 새 종목은 뒤에 남음
+  SYMS.forEach(s=>rowEl[s.id].classList.toggle('gone', hidden.has(s.id)));
+  drawRestore();
+}
+function hideSym(id){ hidden.add(id); rowEl[id].classList.add('gone'); saveLayout(); drawRestore(); if(curId===id){ location.hash=''; } }
+function showSym(id){ hidden.delete(id); rowEl[id].classList.remove('gone'); $('rows').appendChild(rowEl[id]); saveLayout(); drawRestore(); }
+function drawRestore(){
+  const r = $('restore'); r.innerHTML='';
+  if(!hidden.size){ r.className=''; return; }
+  r.className='has'; r.appendChild(document.createTextNode('삭제한 종목 (누르면 복원): '));
+  hidden.forEach(id=>{ const b=document.createElement('button'); b.textContent='+ '+id; b.onclick=()=>showSym(id); r.appendChild(b); });
+}
+// ---- 드래그로 순서 변경 (⋮⋮ 손잡이를 끌기: 마우스·터치 공통) ----
+let drag = null;
+function dragStart(e, row){
+  if(e.button>0 || (e.target.closest && e.target.closest('.x'))) return;
+  e.preventDefault(); e.stopPropagation();
+  drag = {row, id:e.pointerId};
+  row.classList.add('drag');
+  // 행을 옮기면 요소 캡처가 풀리므로 document 에서 받는다
+  document.addEventListener('pointermove', dragMove);
+  document.addEventListener('pointerup', dragEnd); document.addEventListener('pointercancel', dragEnd);
+}
+function dragMove(e){
+  if(!drag) return; e.preventDefault();
+  const box = $('rows'), br = box.getBoundingClientRect();
+  if(e.clientY<br.top+30) box.scrollTop -= 12; else if(e.clientY>br.bottom-30) box.scrollTop += 12;
+  const rows = Array.from(box.children).filter(r=>r!==drag.row && !r.classList.contains('gone'));
+  let before = null;
+  for(const r of rows){ const b=r.getBoundingClientRect(); if(e.clientY < b.top+b.height/2){ before=r; break; } }
+  if(before){ if(drag.row.nextElementSibling!==before) box.insertBefore(drag.row, before); }
+  else if(rows.length){ const last=rows[rows.length-1]; if(last.nextElementSibling!==drag.row) last.after(drag.row); }
+}
+function dragEnd(){
+  if(!drag) return;
+  const {row} = drag; drag=null;
+  row.classList.remove('drag');
+  document.removeEventListener('pointermove', dragMove); document.removeEventListener('pointerup', dragEnd); document.removeEventListener('pointercancel', dragEnd);
+  saveLayout();
+}
+// ---- 글자 크기 / 전체화면 ----
+const FK = 'live-fs'; let fs = 16;
+try{ const v = +localStorage.getItem(FK); if(v>=11 && v<=28) fs = v; }catch(e){}
+function applyFS(){
+  document.documentElement.style.fontSize = fs+'px';
+  if(chart) chart.applyOptions({layout:{fontSize: Math.round(fs*0.8)}});
+  try{ localStorage.setItem(FK, String(fs)); }catch(e){}
+}
+function changeFS(d){ fs = Math.min(28, Math.max(11, fs+d)); applyFS(); }
+const fsEl = ()=>document.fullscreenElement||document.webkitFullscreenElement;
+function toggleFull(){
+  const d=document, e=d.documentElement;
+  if(fsEl()){ (d.exitFullscreen||d.webkitExitFullscreen).call(d); }
+  else if(e.requestFullscreen||e.webkitRequestFullscreen){ try{ const p=(e.requestFullscreen||e.webkitRequestFullscreen).call(e); if(p&&p.catch) p.catch(()=>d.body.classList.toggle('wide')); }catch(_){ d.body.classList.toggle('wide'); } }
+  else d.body.classList.toggle('wide');      // 전체화면 API가 없는 기기(아이폰): 목록 숨기고 차트만 넓게
+  setTimeout(syncFullBtn,200);
+}
+function syncFullBtn(){ const on = !!fsEl() || document.body.classList.contains('wide'); document.querySelectorAll('.fsx').forEach(b=>b.textContent = on?'⤡':'⤢'); }
+function buildTools(){
+  document.querySelectorAll('.tools').forEach(box=>{
+    box.innerHTML = '<button class="fsm" title="글자 작게">A−</button><button class="fsp" title="글자 크게">A+</button><button class="fsx" title="화면 최대화">⤢</button>';
+    box.querySelector('.fsm').onclick = ()=>changeFS(-2);
+    box.querySelector('.fsp').onclick = ()=>changeFS(2);
+    box.querySelector('.fsx').onclick = toggleFull;
+  });
+  $('editBtn').onclick = ()=>{ const on = document.body.classList.toggle('edit'); $('editBtn').classList.toggle('on', on); $('editBtn').textContent = on?'완료':'편집'; };
+  document.addEventListener('fullscreenchange', syncFullBtn); document.addEventListener('webkitfullscreenchange', syncFullBtn);
+  applyFS();
 }
 function updateRow(id){
   const s = BY[id], q = st[id], el = rowEl[id]; if(!q) return;
-  const pr = el.children[1], ch = el.children[2];
+  const pr = el.children[2], ch = el.children[3];
   const old = pr.textContent, nw = fmt(s,q.p);
   pr.textContent = nw;
   if(old!==nw && old!=='—'){ pr.classList.add('flash'); setTimeout(()=>pr.classList.remove('flash'),600); }
   if(q.pc){ const c=(q.p/q.pc-1)*100; ch.textContent = sgn(c); ch.className='ch '+cls(c); pr.className = 'pr '+cls(c); }
-  el.children[3].textContent = hhmm(q.t);
+  el.children[4].textContent = hhmm(q.t);
 }
 function updateConn(){
   const now = Date.now();
@@ -271,7 +380,7 @@ const STEP = {m1:60, m5:300, h1:3600, d1:86400};
 
 function initChart(){
   chart = LightweightCharts.createChart($('chart'),{
-    layout:{background:{color:'#0f1115'},textColor:'#8b93a7'},
+    layout:{background:{color:'#0f1115'},textColor:'#8b93a7',fontSize:Math.round(fs*0.8)},
     grid:{vertLines:{color:'#1b1f27'},horzLines:{color:'#1b1f27'}},
     rightPriceScale:{borderColor:'#2a2f3a',minimumWidth:72},
     timeScale:{borderColor:'#2a2f3a',timeVisible:true,secondsVisible:false,rightOffset:6},
@@ -376,18 +485,18 @@ function updateHead(){
 function route(){
   const id = decodeURIComponent(location.hash.slice(1));
   Object.values(rowEl).forEach(e=>e.classList.remove('sel'));
-  if(id && BY[id]){
+  if(id && BY[id] && !hidden.has(id)){
     curId = id; rowEl[id].classList.add('sel'); document.body.classList.add('chart');
     $('ctitle').textContent = id; updateHead();
     if(!chart) initChart();
     loadChart(false);
   }else{
     document.body.classList.remove('chart'); curId = null;
-    if(matchMedia('(min-width:900px)').matches){ history.replaceState(null,'','#'+SYMS[0].id); route(); }
+    if(matchMedia('(min-width:900px)').matches){ const f = SYMS.length && Array.from($('rows').children).find(r=>!r.classList.contains('gone')); if(f){ history.replaceState(null,'','#'+f.dataset.id); route(); } }
   }
 }
 function buildUI(){
-  buildRows();
+  buildRows(); buildTools();
   const g = $('tfs');
   TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
     b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); loadChart(false); }; g.appendChild(b); });
