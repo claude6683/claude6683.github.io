@@ -510,7 +510,7 @@ async function fetchBars(s, tfk){
     const now = Date.now();
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:iv,startTime:now-500*STEP[tfk]*1000,endTime:now}})});
-    const r = hlRate(s); if(!r) throw new Error('no fx');
+    let r = hlRate(s); for(let i=0;!r && i<40;i++){ await new Promise(z=>setTimeout(z,250)); r = hlRate(s); } if(!r) throw new Error('no fx');   // 환율 도착 대기(최대 10초)
     return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o*r,h:+x.h*r,l:+x.l*r,c:+x.c*r}));
   }
   const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
