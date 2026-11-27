@@ -43,6 +43,7 @@
   .grp{display:flex;gap:4px}
   #cwrap{position:relative;flex:1;min-height:0}
   #chart{position:absolute;inset:0}
+  #lastp{position:absolute;right:4px;top:0;z-index:5;padding:2px 8px;border-radius:4px;color:#fff;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none;display:none;white-space:nowrap}
   #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(22,26,33,.95);border:1px solid #3a4254;border-radius:6px;padding:6px 9px;font-size:.75rem;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
   #cmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--sub);font-size:.875rem;pointer-events:none}
   #cnote{flex:none;padding:6px 12px;border-top:1px solid var(--line);font-size:.6875rem;color:var(--sub)}
@@ -109,7 +110,7 @@
       </div>
       <div class="tools"></div>
     </div>
-    <div id="cwrap"><div id="chart"></div><div id="tip"></div><div id="cmsg"></div></div>
+    <div id="cwrap"><div id="chart"></div><div id="tip"></div><div id="lastp"></div><div id="cmsg"></div></div>
     <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 더블클릭 초기화 · 상승 빨강 / 하락 파랑</div>
   </section>
 </div>
@@ -448,8 +449,8 @@ function initChart(){
   chart = LightweightCharts.createChart($('chart'),{
     layout:{background:{color:'#0f1115'},textColor:'#8b93a7',fontSize:Math.round(fs*0.8)},
     grid:{vertLines:{color:'#1b1f27'},horzLines:{color:'#1b1f27'}},
-    rightPriceScale:{borderColor:'#2a2f3a',minimumWidth:72},
-    timeScale:{borderColor:'#2a2f3a',timeVisible:true,secondsVisible:false,rightOffset:6},
+    rightPriceScale:{visible:false},
+    timeScale:{borderColor:'#2a2f3a',timeVisible:true,secondsVisible:false,rightOffset:12},
     crosshair:{mode:0},
     handleScroll:{mouseWheel:false,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},
     handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:true},
@@ -457,7 +458,7 @@ function initChart(){
   });
   series = chart.addCandlestickSeries({
     upColor:'#ef4444',downColor:'#3b82f6',borderVisible:false,wickUpColor:'#ef4444',wickDownColor:'#3b82f6',
-    priceLineVisible:true,lastValueVisible:true,
+    priceLineVisible:true,lastValueVisible:false,
   });
   new ResizeObserver(()=>chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight})).observe($('chart'));
   chart.subscribeCrosshairMove(onCross);
@@ -470,8 +471,21 @@ function render(){
   if(!series) return;
   series.setData(bars.map(toPt));
   if(zeroLine){ series.removePriceLine(zeroLine); zeroLine=null; }
-  zeroLine = series.createPriceLine({price: mode==='pct'?0:base, color:'#6b7280', lineWidth:1, lineStyle:2, axisLabelVisible:true, title: mode==='pct'?'0%':'종가'});
+  zeroLine = series.createPriceLine({price: mode==='pct'?0:base, color:'#6b7280', lineWidth:1, lineStyle:2, axisLabelVisible:false, title:''});
 }
+// 현재가 라벨: 눈금 숫자는 숨기고, 현재가만 큰 글씨(기본 글자의 150%)로 오른쪽에 표시
+let lastpKey = '';
+function drawLastP(){
+  const el = $('lastp'); if(!el || !series || !bars.length){ if(el) el.style.display='none'; return; }
+  const b = bars[bars.length-1], v = tv(b.c), y = series.priceToCoordinate(v), h = $('chart').clientHeight;
+  if(y==null || !isFinite(y)){ el.style.display='none'; return; }
+  const fsz = Math.round(fs*1.2), up = b.c >= base;
+  const key = v+'|'+fsz+'|'+up; if(key!==lastpKey){ lastpKey=key; el.textContent = mode==='pct' ? (v>0?'+':'')+v.toFixed(2)+'%' : yfmt(v); el.style.fontSize=fsz+'px'; el.style.background = up?'#ef4444':'#3b82f6'; }
+  el.style.display='block';
+  const eh = el.offsetHeight || fsz+6;
+  el.style.top = Math.max(0, Math.min(h-eh, y-eh/2))+'px';
+}
+setInterval(drawLastP, 120);
 function resetView(){
   const n = bars.length; if(!n) return;
   chart.priceScale('right').applyOptions({autoScale:true});
