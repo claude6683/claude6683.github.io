@@ -163,6 +163,7 @@ const $ = id => document.getElementById(id);
 
 // ---- 공통 ----
 const fmt = (s,v)=> v==null||!isFinite(v) ? '—' : v.toLocaleString('en-US',{minimumFractionDigits:s.dec,maximumFractionDigits:s.dec});
+const KEEP_DEC = new Set(['BPUSDT','SCHD','SCHG']);   // 목록 현재가: 이 종목만 소수점 유지, 나머지는 소수점 없이
 const hhmm = ms => ms ? new Date(ms+KST*1000).toISOString().slice(11,16) : '--:--';
 const sgn = v => (v>0?'+':'')+v.toFixed(2)+'%';
 const cls = v => v>0?'up':(v<0?'dn':'');
@@ -338,7 +339,7 @@ function buildTools(){
 function updateRow(id){
   const s = BY[id], q = st[id], el = rowEl[id]; if(!q||!el||q.p==null) return;
   const pr = el.children[2], ch = el.children[3];
-  const old = pr.textContent, nw = fmt(s,q.p);
+  const old = pr.textContent, nw = fmt(KEEP_DEC.has(s.id)?s:{dec:0},q.p);
   pr.textContent = nw;
   if(old!==nw && old!=='—'){ pr.classList.add('flash'); setTimeout(()=>pr.classList.remove('flash'),600); }
   if(q.pc){ const c=(q.p/q.pc-1)*100; ch.textContent = sgn(c); ch.className='ch '+cls(c); pr.className = 'pr '+cls(c); }
