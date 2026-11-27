@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: dash-data
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   update:
