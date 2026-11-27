@@ -2,10 +2,14 @@
 //  GET /?q=NVDA,GOOGL,^KS11   -> 야후 시세 묶음 {SYM:{p,pc,t}}  (p=현재가, pc=전일 종가, t=마지막 체결 ms)
 //  GET /?s=nvidia             -> 야후 종목 검색 [{symbol,name,type,exch}] (최대 8개)
 //  GET /?u=<url>              -> 허용된 거래소/야후 주소를 대신 받아 전달 (브라우저 CORS 우회)
-const ALLOW = new Set([
-  "query1.finance.yahoo.com", "query2.finance.yahoo.com",
-  "api.upbit.com", "api.binance.com", "api.hyperliquid.xyz", "api.backpack.exchange",
-]);
+const ALLOW = {
+  "query1.finance.yahoo.com": ["/v8/finance/chart/"],
+  "query2.finance.yahoo.com": ["/v8/finance/chart/", "/v1/finance/search"],
+  "api.upbit.com": ["/v1/candles/"],
+  "api.binance.com": ["/api/v3/klines"],
+  "api.hyperliquid.xyz": ["/info"],
+  "api.backpack.exchange": ["/api/v1/klines", "/api/v1/ticker"],
+};
 const UA = { "user-agent": "Mozilla/5.0 (compatible; LiveShow/1.0)" };
 
 function parseQuote(j) {
@@ -46,7 +50,8 @@ export default {
       if (sq) {
         const r = await fetch("https://query2.finance.yahoo.com/v1/finance/search?newsCount=0&quotesCount=8&lang=en-US&q=" + encodeURIComponent(sq),
           { headers: UA, cf: { cacheTtl: 60, cacheEverything: true } });
-        const j = r.ok ? await r.json() : {};
+        if (!r.ok) return new Response("[]", { status: 502, headers: { ...cors, "content-type": "application/json", "cache-control": "no-store" } });
+        const j = await r.json();
         const ok = new Set(["EQUITY", "ETF", "INDEX", "FUTURE", "CURRENCY", "CRYPTOCURRENCY", "MUTUALFUND"]);
         const out = ((j && j.quotes) || []).filter(x => x.symbol && ok.has(x.quoteType))
           .map(x => ({ symbol: x.symbol, name: x.shortname || x.longname || "", type: x.quoteType, exch: x.exchDisp || x.exchange || "" }));
@@ -56,7 +61,7 @@ export default {
       }
       const q = url.searchParams.get("q");
       if (q) {
-        const syms = q.split(",").map(s => s.trim()).filter(Boolean).slice(0, 40);
+        const syms = q.split(",").map(s => s.trim()).filter(Boolean).slice(0, 20);
         const out = {};
         await Promise.all(syms.map(async s => {
           try { const v = await yahooQuote(s); if (v) out[s] = v; } catch (e) { /* 한 종목 실패는 건너뜀 */ }
@@ -68,18 +73,20 @@ export default {
       const u = url.searchParams.get("u");
       if (u) {
         const t = new URL(u);
-        if (t.protocol !== "https:" || !ALLOW.has(t.hostname)) {
+        const pre = ALLOW[t.hostname];
+        if (t.protocol !== "https:" || !pre || !pre.some(x => t.pathname.startsWith(x))) {
           return new Response("forbidden", { status: 403, headers: cors });
         }
-        const r = await fetch(t.toString(), { headers: UA, cf: { cacheTtl: 5, cacheEverything: true } });
+        const r = await fetch(t.toString(), { headers: UA, redirect: "manual", cf: { cacheTtl: 5, cacheEverything: true } });
+        if (r.status >= 300 && r.status < 400) return new Response("redirect blocked", { status: 502, headers: cors });
         return new Response(r.body, {
           status: r.status,
-          headers: { ...cors, "content-type": r.headers.get("content-type") || "application/json", "cache-control": "public, max-age=5" },
+          headers: { ...cors, "content-type": r.headers.get("content-type") || "application/json", "x-content-type-options": "nosniff", "cache-control": "public, max-age=5" },
         });
       }
       return new Response("live-quotes ok", { headers: cors });
     } catch (e) {
-      return new Response(JSON.stringify({ error: String(e) }), { status: 502, headers: { ...cors, "content-type": "application/json" } });
+      return new Response(JSON.stringify({ error: "upstream error" }), { status: 502, headers: { ...cors, "content-type": "application/json" } });
     }
   },
 };

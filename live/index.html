@@ -65,7 +65,7 @@
   body.edit #editHint{display:inline}
   #addPanel{display:none;flex:none;padding:8px 14px;border-bottom:1px solid var(--line)}
   #addPanel.open{display:block}
-  #addQ{width:100%;font:inherit;color:inherit;background:#0f1319;border:1px solid var(--line);border-radius:6px;padding:7px 10px}
+  #addQ{width:100%;font-size:max(16px,1rem);font-family:inherit;color:inherit;background:#0f1319;border:1px solid var(--line);border-radius:6px;padding:7px 10px}
   #addRes{font-size:.8125rem;color:var(--sub);max-height:14rem;overflow:auto;margin-top:6px}
   #addRes .sr{display:block;width:100%;text-align:left;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
   .row .pr{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -154,9 +154,9 @@ const SYMS = [
 const CK = 'live-custom-v1';
 function loadCustom(){ try{ const a=JSON.parse(localStorage.getItem(CK)||'[]'); return (Array.isArray(a)?a:[]).filter(c=>c&&typeof c.k==='string'&&/^[\w.^=\-]{1,24}$/.test(c.k)); }catch(e){ return []; } }
 function saveCustom(){ try{ localStorage.setItem(CK, JSON.stringify(SYMS.filter(x=>x.custom).map(x=>({k:x.k,dec:x.dec,name:x.name||''})))); }catch(e){} }
-loadCustom().forEach(c=>{ if(!SYMS.some(x=>x.id===c.k)) SYMS.push({id:c.k, src:'yf', k:c.k, dec:+c.dec||0, name:String(c.name||''), custom:true}); });
-const BY = {}; SYMS.forEach(s=>BY[s.id]=s);
-const st = {};          // id -> {p, pc, t(ms)}
+loadCustom().forEach(c=>{ if(!SYMS.some(x=>x.id===c.k)) SYMS.push({id:c.k, src:'yf', k:c.k, dec:Math.min(8,Math.max(0,(+c.dec)|0)), name:String(c.name||''), custom:true}); });
+const BY = Object.create(null); SYMS.forEach(s=>BY[s.id]=s);
+const st = Object.create(null);          // id -> {p, pc, t(ms)}
 const feedAt = {bn:0, up:0, hl:0, yf:0, bp:0};
 const $ = id => document.getElementById(id);
 
@@ -168,8 +168,7 @@ const cls = v => v>0?'up':(v<0?'dn':'');
 function timeout(ms){ const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms); return {signal:c.signal, done:()=>clearTimeout(t)}; }
 async function getJSON(url, opt){
   const tries = [url];
-  if(WORKER) tries.push(WORKER+'/?u='+encodeURIComponent(url));
-  tries.push('https://corsproxy.io/?'+encodeURIComponent(url), 'https://api.allorigins.win/raw?url='+encodeURIComponent(url));
+  if(WORKER && url.indexOf(WORKER)!==0 && !(opt&&opt.method&&opt.method!=='GET')) tries.push(WORKER+'/?u='+encodeURIComponent(url));   // 제3자 프록시는 쓰지 않음(가격 위조·검색어 유출 방지)
   let err;
   for(const u of tries){
     const t = timeout(12000);
@@ -200,7 +199,7 @@ function flush(){
 }
 
 // ---- 목록 ----
-const rowEl = {};
+const rowEl = Object.create(null);
 function buildRows(){
   SYMS.forEach(addRow);
   applyLayout();
@@ -249,7 +248,7 @@ function drawRestore(){
 // ---- 드래그로 순서 변경 (⋮⋮ 손잡이를 끌기: 마우스·터치 공통) ----
 let drag = null;
 function dragStart(e, row){
-  if(e.button>0 || (e.target.closest && e.target.closest('.x'))) return;
+  if(drag || e.button>0 || (e.target.closest && e.target.closest('.x'))) return;
   e.preventDefault(); e.stopPropagation();
   drag = {row, id:e.pointerId};
   row.classList.add('drag');
@@ -258,7 +257,7 @@ function dragStart(e, row){
   document.addEventListener('pointerup', dragEnd); document.addEventListener('pointercancel', dragEnd);
 }
 function dragMove(e){
-  if(!drag) return; e.preventDefault();
+  if(!drag || e.pointerId!==drag.id) return; e.preventDefault();
   const box = $('rows'), br = box.getBoundingClientRect();
   if(e.clientY<br.top+30) box.scrollTop -= 12; else if(e.clientY>br.bottom-30) box.scrollTop += 12;
   const rows = Array.from(box.children).filter(r=>r!==drag.row && !r.classList.contains('gone'));
@@ -267,8 +266,8 @@ function dragMove(e){
   if(before){ if(drag.row.nextElementSibling!==before) box.insertBefore(drag.row, before); }
   else if(rows.length){ const last=rows[rows.length-1]; if(last.nextElementSibling!==drag.row) last.after(drag.row); }
 }
-function dragEnd(){
-  if(!drag) return;
+function dragEnd(e){
+  if(!drag || (e && e.pointerId!==drag.id)) return;
   const {row} = drag; drag=null;
   row.classList.remove('drag');
   document.removeEventListener('pointermove', dragMove); document.removeEventListener('pointerup', dragEnd); document.removeEventListener('pointercancel', dragEnd);
@@ -296,7 +295,8 @@ function syncFullBtn(){ const on = !!fsEl() || document.body.classList.contains(
 function addSym(k, name){
   k = String(k||'').trim();
   if(!/^[\w.^=\-]{1,24}$/.test(k)) return false;
-  if(BY[k]){ if(hidden.has(k)) showSym(k); location.hash = '#'+k; return true; }
+  const dup = SYMS.find(x=>x.id===k || (x.src==='yf' && x.k.toUpperCase()===k.toUpperCase()));
+  if(dup){ if(hidden.has(dup.id)) showSym(dup.id); location.hash = '#'+dup.id; return true; }
   const dec = /\.(KS|KQ)$/i.test(k) ? 0 : 2;
   const o = {id:k, src:'yf', k, dec, name:String(name||''), custom:true};
   SYMS.push(o); BY[k]=o; addRow(o); saveCustom(); saveLayout(); pollYahoo(); location.hash = '#'+k; return true;
@@ -321,7 +321,7 @@ async function doSearch(q){
 function buildAdd(){
   $('addBtn').onclick = ()=>{ const p=$('addPanel'); p.classList.toggle('open'); if(p.classList.contains('open')) $('addQ').focus(); };
   $('addQ').addEventListener('input', ()=>{ clearTimeout(sT); const q=$('addQ').value.trim(); sT=setTimeout(()=>doSearch(q), 350); });
-  $('addQ').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const q=$('addQ').value.trim().toUpperCase(); if(addSym(q)){ $('addQ').value=''; $('addRes').textContent=''; $('addPanel').classList.remove('open'); } else $('addRes').textContent='티커 형식이 아니에요 (영문·숫자·.^=- 만)'; } });
+  $('addQ').addEventListener('keydown', e=>{ if(e.isComposing||e.keyCode===229) return; if(e.key==='Enter'){ clearTimeout(sT); sSeq++; const q=$('addQ').value.trim().toUpperCase(); if(addSym(q)){ $('addQ').value=''; $('addRes').textContent=''; $('addPanel').classList.remove('open'); } else $('addRes').textContent='티커 형식이 아니에요 (영문·숫자·.^=- 만)'; } });
 }
 function buildTools(){
   document.querySelectorAll('.tools').forEach(box=>{
@@ -498,12 +498,12 @@ async function fetchBars(s, tfk){
   const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
   const j = await getJSON('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(s.k)+'?range='+rg[0]+'&interval='+rg[1]+'&includePrePost=true');
   const r = j.chart.result[0], q = r.indicators.quote[0], out = [];
-  (r.timestamp||[]).forEach((t,i)=>{ if(q.close[i]!=null && q.open[i]!=null) out.push({time:t,o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i]}); });
+  (r.timestamp||[]).forEach((t,i)=>{ if(q.close[i]!=null && q.open[i]!=null && q.high[i]!=null && q.low[i]!=null) out.push({time:t,o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i]}); });
   return out;
 }
 async function loadChart(keepView){
   if(!curId) return; const s = BY[curId], my = ++loadSeq;
-  $('cmsg').textContent = '불러오는 중…';
+  if(!keepView) $('cmsg').textContent = '불러오는 중…';
   try{
     const b = await fetchBars(s, tf);
     if(my!==loadSeq) return;
@@ -512,7 +512,7 @@ async function loadChart(keepView){
     byTime = new Map(bars.map(x=>[x.time+KST,x]));
     $('cmsg').textContent = '';
     render(); if(!keepView) resetView();
-  }catch(e){ if(my===loadSeq){ if(keepView && bars.length) return; bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
+  }catch(e){ if(my===loadSeq){ if(keepView && bars.length){ $('cmsg').textContent=''; return; } bars=[]; if(series) series.setData([]); $('cmsg').textContent = '차트 데이터를 불러오지 못했어요. 잠시 후 다시 시도해 줘.'; } }
 }
 // 실시간 틱 → 마지막 봉 갱신
 function liveTick(id, p, tms){
@@ -552,8 +552,9 @@ function updateHead(){
 function route(){
   let id=''; try{ id = decodeURIComponent(location.hash.slice(1)); }catch(e){}
   Object.values(rowEl).forEach(e=>e.classList.remove('sel'));
-  if(id && BY[id] && !hidden.has(id)){
-    curId = id; rowEl[id].classList.add('sel'); document.body.classList.add('chart');
+  if(id && BY[id] && rowEl[id] && !hidden.has(id)){
+    if(curId!==id){ bars=[]; byTime=new Map(); if(series) series.setData([]); $('cprice').textContent=''; }
+    curId = id; if(rowEl[id]) rowEl[id].classList.add('sel'); document.body.classList.add('chart');
     $('ctitle').textContent = id; updateHead();
     if(!chart) initChart();
     loadChart(false);
