@@ -67,6 +67,7 @@
     home.textContent = '#6683';
     home.setAttribute('data-hf', '#6683');
     home.draggable = false;
+    home.target = '_self'; // <base target=_blank> 페이지(Fishing 등)에서도 같은 탭으로 이동
     bar.appendChild(home);
 
     list.forEach(function (t) {
@@ -77,6 +78,7 @@
       a.setAttribute('data-s', t[2]);
       a.setAttribute('data-h', t[0]);
       a.draggable = false;
+      a.target = '_self';
       if (page && t[0] === '/' + page + '/') a.className = 'on';
       bar.appendChild(a);
     });
