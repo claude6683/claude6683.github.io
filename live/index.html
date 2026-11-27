@@ -453,10 +453,10 @@ async function pollYahoo(){
 }
 
 // ---- 차트 ----
-const TFS = [['m1','1분'],['m5','5분'],['h1','1시간'],['d1','일']];
+const TFS = [['m1','1분'],['m5','5분'],['h1','1시간'],['d1','일'],['w1','주']];
 let curId = null, tf = 'm5', mode = 'price', chart = null, series = null, zeroLine = null;
 let bars = [], base = 1, byTime = new Map(), loadSeq = 0, reloadT = 0;
-const STEP = {m1:60, m5:300, h1:3600, d1:86400};
+const STEP = {m1:60, m5:300, h1:3600, d1:86400, w1:604800};
 
 function initChart(){
   chart = LightweightCharts.createChart($('chart'),{
@@ -521,13 +521,13 @@ function resetView(){
   chart.timeScale().setVisibleLogicalRange({from:Math.max(0,n-120), to:n+6});
 }
 async function fetchBars(s, tfk){
-  const iv = {m1:'1m',m5:'5m',h1:'1h',d1:'1d'}[tfk];
+  const iv = {m1:'1m',m5:'5m',h1:'1h',d1:'1d',w1:'1w'}[tfk];
   if(s.src==='bn'){
     const j = await getJSON('https://api.binance.com/api/v3/klines?symbol='+s.k+'&interval='+iv+'&limit=500');
     return j.map(x=>({time:Math.floor(x[0]/1000),o:+x[1],h:+x[2],l:+x[3],c:+x[4]}));
   }
   if(s.src==='up'){
-    const u = {m1:'minutes/1',m5:'minutes/5',h1:'minutes/60',d1:'days'}[tfk];
+    const u = {m1:'minutes/1',m5:'minutes/5',h1:'minutes/60',d1:'days',w1:'weeks'}[tfk];
     const j = await getJSON('https://api.upbit.com/v1/candles/'+u+'?market='+s.k+'&count=200');
     return j.map(x=>({time:Math.floor(Date.parse(x.candle_date_time_utc+'Z')/1000),o:x.opening_price,h:x.high_price,l:x.low_price,c:x.trade_price})).reverse();
   }
@@ -542,7 +542,7 @@ async function fetchBars(s, tfk){
     let r = hlRate(s); for(let i=0;!r && i<40;i++){ await new Promise(z=>setTimeout(z,250)); r = hlRate(s); } if(!r) throw new Error('no fx');   // 환율 도착 대기(최대 10초)
     return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o*r,h:+x.h*r,l:+x.l*r,c:+x.c*r}));
   }
-  const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
+  const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d'],w1:['10y','1wk']}[tfk];
   const j = await getJSON('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(s.k)+'?range='+rg[0]+'&interval='+rg[1]+'&includePrePost=true');
   const r = j.chart.result[0], q = r.indicators.quote[0], out = [];
   (r.timestamp||[]).forEach((t,i)=>{ if(q.close[i]!=null && q.open[i]!=null && q.high[i]!=null && q.low[i]!=null) out.push({time:t,o:q.open[i],h:q.high[i],l:q.low[i],c:q.close[i]}); });
@@ -566,7 +566,7 @@ function liveTick(id, p, tms){
   if(id!==curId || !bars.length) return;
   const step = STEP[tf], last = bars[bars.length-1];
   const bt = Math.floor(tms/1000/step)*step;
-  if(bt > last.time && tf!=='d1'){
+  if(bt > last.time && tf!=='d1' && tf!=='w1'){
     const nb = {time:bt,o:last.c,h:Math.max(last.c,p),l:Math.min(last.c,p),c:p}; bars.push(nb); byTime.set(nb.time+KST,nb);
   }else{
     last.c = p; if(p>last.h) last.h=p; if(p<last.l) last.l=p;
@@ -585,7 +585,7 @@ function onCross(p){
 function showTip(b, t, x, y){
   const tip = $('tip'), s = BY[curId], c = (b.c/base-1)*100;
   const d = new Date(t*1000).toISOString();
-  const day = tf==='d1';
+  const day = tf==='d1' || tf==='w1';
   tip.innerHTML = '<div>'+d.slice(0,10)+(day?'':' '+d.slice(11,16))+'</div>'
     + '<div>가격 <b>'+fmt(s,b.c)+'</b></div>'
     + '<div>종가 대비 <b class="'+cls(c)+'">'+sgn(c)+'</b></div>';
