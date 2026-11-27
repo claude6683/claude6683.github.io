@@ -480,7 +480,7 @@ function drawLastP(){
   const b = bars[bars.length-1], v = tv(b.c), y = series.priceToCoordinate(v), h = $('chart').clientHeight;
   if(y==null || !isFinite(y)){ el.style.display='none'; return; }
   const fsz = Math.round(fs*1.2), up = b.c >= base;
-  const key = v+'|'+fsz+'|'+up; if(key!==lastpKey){ lastpKey=key; el.textContent = mode==='pct' ? (v>0?'+':'')+v.toFixed(2)+'%' : yfmt(v); el.style.fontSize=fsz+'px'; el.style.background = up?'#ef4444':'#3b82f6'; }
+  const key = b.c+'|'+fsz+'|'+up; if(key!==lastpKey){ lastpKey=key; el.textContent = yfmt(b.c); el.style.fontSize=fsz+'px'; el.style.background = up?'#ef4444':'#3b82f6'; }
   el.style.display='block';
   const eh = el.offsetHeight || fsz+6;
   el.style.top = Math.max(0, Math.min(h-eh, y-eh/2))+'px';
