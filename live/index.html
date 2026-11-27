@@ -376,21 +376,22 @@ function wsUpbit(){
     return w;
   });
 }
-function hlRate(s){ return s.krw ? ((st.USDKRW&&st.USDKRW.p)||1340) : 1; }   // 원화 종목: 달러 시세 × 원/달러(야후 USDKRW)
+function hlRate(s){ return s.krw ? ((st.USDKRW&&st.USDKRW.p)||0) : 1; }   // 환율 없으면 0 → 원화 종목은 환율 올 때까지 표시 보류   // 원화 종목: 달러 시세 × 원/달러(야후 USDKRW)
 function wsHyper(){
   const list = SYMS.filter(x=>x.src==='hl'); if(!list.length) return;
   const byCoin = {}; list.forEach(s=>byCoin[s.k]=s);
   const prev = async ()=>{ for(const s of list){ try{
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:'1d',startTime:Date.now()-4*864e5,endTime:Date.now()}})});
-    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c*hlRate(s); if(o.p==null){ o.p=+j[j.length-1].c*hlRate(s); o.t=Date.now(); } dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
+    if(j.length>=2 && hlRate(s)){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c*hlRate(s); if(o.p==null){ o.p=+j[j.length-1].c*hlRate(s); o.t=Date.now(); } dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
   }catch(e){} } };
-  prev(); setInterval(prev, 300000);
+  prev(); setTimeout(prev, 20000); setInterval(prev, 300000);
   connect(()=>{
     const w = new WebSocket('wss://api.hyperliquid.xyz/ws');
+    const pg = setInterval(()=>{ if(w.readyState===1) w.send('{"method":"ping"}'); }, 30000); w.addEventListener('close', ()=>clearInterval(pg));
     w.onopen = ()=>list.forEach(s=>w.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:s.k,interval:'1m'}})));
     w.onmessage = e=>{ let j; try{ j=JSON.parse(e.data); }catch(x){ return; } if(j.channel!=='candle'||!j.data) return;
-      const s = byCoin[j.data.s]; if(!s) return;
+      const s = byCoin[j.data.s]; if(!s || !hlRate(s)) return;
       feedAt.hl=Date.now(); setQuote(s.id, +j.data.c*hlRate(s), null, Date.now()); };
     return w;
   });
@@ -495,7 +496,7 @@ async function fetchBars(s, tfk){
     const now = Date.now();
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:iv,startTime:now-500*STEP[tfk]*1000,endTime:now}})});
-    const r = hlRate(s);
+    const r = hlRate(s); if(!r) throw new Error('no fx');
     return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o*r,h:+x.h*r,l:+x.l*r,c:+x.c*r}));
   }
   const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
