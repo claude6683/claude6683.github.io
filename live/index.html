@@ -146,8 +146,8 @@ const SYMS = [
   {id:'SCHD',     src:'yf', k:'SCHD',     dec:2},
   {id:'SPCX', src:'hl', k:'xyz:SPCX', dec:2},
   {id:'VOO',      src:'yf', k:'VOO',      dec:2},
-  {id:'000660', src:'hl', k:'xyz:SKHX', dec:0, krw:1},
-  {id:'005930', src:'hl', k:'xyz:SMSN', dec:0, krw:1},
+  {id:'000660', src:'hl', k:'xyz:SKHX', dec:0, krw:1, label:'SKHYNIX'},
+  {id:'005930', src:'hl', k:'xyz:SMSN', dec:0, krw:1, label:'SAMSUNG'},
   {id:'EWY', src:'hl', k:'xyz:EWY', dec:2},
   {id:'NVDA', src:'hl', k:'xyz:NVDA', dec:2},
 ];
@@ -210,7 +210,7 @@ function addRow(s){
   {
     const d = document.createElement('div'); d.className='row'; d.dataset.id=s.id;
     d.innerHTML = '<span class="hd" title="끌어서 이동"><span class="g">⋮⋮</span><button class="x" title="삭제">✕</button></span><span class="nm"></span><span class="pr">—</span><span class="ch">—</span><span class="tm">--:--</span>';
-    d.querySelector('.nm').textContent = s.id; if(s.name) d.querySelector('.nm').title = s.name;
+    d.querySelector('.nm').textContent = s.label||s.id; if(s.name) d.querySelector('.nm').title = s.name;
     d.onclick = ()=>{ if(document.body.classList.contains('edit')) return; location.hash = '#'+s.id; };
     d.querySelector('.x').onclick = e=>{ e.stopPropagation(); hideSym(s.id); };
     d.querySelector('.hd').addEventListener('pointerdown', e=>dragStart(e,d));
@@ -573,7 +573,7 @@ function route(){
   if(id && BY[id] && rowEl[id] && !hidden.has(id)){
     if(curId!==id){ bars=[]; byTime=new Map(); if(series) series.setData([]); $('cprice').textContent=''; }
     curId = id; if(rowEl[id]) rowEl[id].classList.add('sel'); document.body.classList.add('chart');
-    $('ctitle').textContent = id; updateHead();
+    $('ctitle').textContent = (BY[id]&&BY[id].label)||id; updateHead();
     if(!chart) initChart();
     loadChart(false);
   }else{
