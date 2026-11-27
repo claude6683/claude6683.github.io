@@ -383,7 +383,7 @@ function wsHyper(){
   const prev = async ()=>{ for(const s of list){ try{
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:'1d',startTime:Date.now()-4*864e5,endTime:Date.now()}})});
-    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c*hlRate(s); dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
+    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c*hlRate(s); if(o.p==null){ o.p=+j[j.length-1].c*hlRate(s); o.t=Date.now(); } dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
   }catch(e){} } };
   prev(); setInterval(prev, 300000);
   connect(()=>{
