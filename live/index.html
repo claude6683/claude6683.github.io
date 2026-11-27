@@ -137,18 +137,18 @@ const SYMS = [
   {id:'XYZ100USD',src:'hl', k:'xyz:XYZ100',dec:2},
   {id:'NAS100',   src:'yf', k:'NQ=F',     dec:2},
   {id:'KOSPI',    src:'yf', k:'^KS11',    dec:2},
-  {id:'GOOGL',    src:'yf', k:'GOOGL',    dec:2},
+  {id:'GOOGL', src:'hl', k:'xyz:GOOGL', dec:2},
   {id:'BPUSDT',  src:'bp', k:'BP_USDC', dec:4},
   {id:'GOLD',     src:'yf', k:'GC=F',     dec:2},
   {id:'QQQM',     src:'yf', k:'QQQM',     dec:2},
   {id:'SCHG',     src:'yf', k:'SCHG',     dec:2},
   {id:'SCHD',     src:'yf', k:'SCHD',     dec:2},
-  {id:'SPCX',     src:'yf', k:'SPCX',     dec:2},
+  {id:'SPCX', src:'hl', k:'xyz:SPCX', dec:2},
   {id:'VOO',      src:'yf', k:'VOO',      dec:2},
-  {id:'000660',   src:'yf', k:'000660.KS',dec:0},
-  {id:'005930',   src:'yf', k:'005930.KS',dec:0},
-  {id:'EWY',      src:'yf', k:'EWY',      dec:2},
-  {id:'NVDA',     src:'yf', k:'NVDA',     dec:2},
+  {id:'000660', src:'hl', k:'xyz:SKHX', dec:0, krw:1},
+  {id:'005930', src:'hl', k:'xyz:SMSN', dec:0, krw:1},
+  {id:'EWY', src:'hl', k:'xyz:EWY', dec:2},
+  {id:'NVDA', src:'hl', k:'xyz:NVDA', dec:2},
 ];
 // 직접 추가한 종목 (브라우저에 저장)
 const CK = 'live-custom-v1';
@@ -376,23 +376,25 @@ function wsUpbit(){
     return w;
   });
 }
+function hlRate(s){ return s.krw ? ((st.USDKRW&&st.USDKRW.p)||1340) : 1; }   // 원화 종목: 달러 시세 × 원/달러(야후 USDKRW)
 function wsHyper(){
-  const s = SYMS.find(x=>x.src==='hl'); if(!s) return;
-  const prev = async ()=>{ try{
+  const list = SYMS.filter(x=>x.src==='hl'); if(!list.length) return;
+  const byCoin = {}; list.forEach(s=>byCoin[s.k]=s);
+  const prev = async ()=>{ for(const s of list){ try{
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:'1d',startTime:Date.now()-4*864e5,endTime:Date.now()}})});
-    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c; dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
-  }catch(e){} };
+    if(j.length>=2){ const o=st[s.id]||(st[s.id]={}); o.pc=+j[j.length-2].c*hlRate(s); dirtyIds.add(s.id); if(!raf) raf=requestAnimationFrame(flush); }
+  }catch(e){} } };
   prev(); setInterval(prev, 300000);
   connect(()=>{
     const w = new WebSocket('wss://api.hyperliquid.xyz/ws');
-    w.onopen = ()=>w.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:s.k,interval:'1m'}}));
-    w.onmessage = e=>{ const j=JSON.parse(e.data); if(j.channel!=='candle'||!j.data) return;
-      feedAt.hl=Date.now(); setQuote(s.id, +j.data.c, null, Date.now()); liveBar(s.id, j.data); };
+    w.onopen = ()=>list.forEach(s=>w.send(JSON.stringify({method:'subscribe',subscription:{type:'candle',coin:s.k,interval:'1m'}})));
+    w.onmessage = e=>{ let j; try{ j=JSON.parse(e.data); }catch(x){ return; } if(j.channel!=='candle'||!j.data) return;
+      const s = byCoin[j.data.s]; if(!s) return;
+      feedAt.hl=Date.now(); setQuote(s.id, +j.data.c*hlRate(s), null, Date.now()); };
     return w;
   });
 }
-
 function wsBackpack(){
   const list = SYMS.filter(s=>s.src==='bp'); if(!list.length) return; const map={}; list.forEach(s=>map[s.k]=s);
   connect(()=>{
@@ -493,7 +495,8 @@ async function fetchBars(s, tfk){
     const now = Date.now();
     const j = await getJSON('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},
       body:JSON.stringify({type:'candleSnapshot',req:{coin:s.k,interval:iv,startTime:now-500*STEP[tfk]*1000,endTime:now}})});
-    return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o,h:+x.h,l:+x.l,c:+x.c}));
+    const r = hlRate(s);
+    return j.map(x=>({time:Math.floor(x.t/1000),o:+x.o*r,h:+x.h*r,l:+x.l*r,c:+x.c*r}));
   }
   const rg = {m1:['2d','1m'],m5:['5d','5m'],h1:['1mo','60m'],d1:['1y','1d']}[tfk];
   const j = await getJSON('https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(s.k)+'?range='+rg[0]+'&interval='+rg[1]+'&includePrePost=true');
