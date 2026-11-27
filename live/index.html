@@ -479,8 +479,8 @@ function drawLastP(){
   const el = $('lastp'); if(!el || !series || !bars.length){ if(el) el.style.display='none'; return; }
   const b = bars[bars.length-1], v = tv(b.c), y = series.priceToCoordinate(v), h = $('chart').clientHeight;
   if(y==null || !isFinite(y)){ el.style.display='none'; return; }
-  const fsz = Math.round(fs*1.2), up = b.c >= base;
-  const key = b.c+'|'+fsz+'|'+up; if(key!==lastpKey){ lastpKey=key; el.textContent = yfmt(b.c); el.style.fontSize=fsz+'px'; el.style.background = up?'#ef4444':'#3b82f6'; }
+  const fsz = Math.round(fs*1.44), up = b.c >= base;
+  const key = b.c+'|'+fsz+'|'+up; if(key!==lastpKey){ lastpKey=key; el.textContent = Math.abs(b.c)>=100 ? Math.round(b.c).toLocaleString('en-US') : yfmt(b.c); el.style.fontSize=fsz+'px'; el.style.background = up?'#ef4444':'#3b82f6'; }
   el.style.display='block';
   const eh = el.offsetHeight || fsz+6;
   el.style.top = Math.max(0, Math.min(h-eh, y-eh/2))+'px';
