@@ -81,7 +81,7 @@
   .sbar select{font-family:inherit;color:inherit;background:#1d2330;border:1px solid var(--line)}
   .sbar .lbl{color:var(--sub);font-size:.625rem;white-space:nowrap;margin-left:4px;flex:none}
   #draw{position:absolute;left:0;top:0;z-index:4;pointer-events:none}
-  #draw.act{pointer-events:auto;cursor:crosshair}
+  #cwrap.tool{cursor:crosshair}
 
   /* 모바일: 목록 → 차트 전환 */
   body.chart #listView{display:none}
@@ -475,7 +475,16 @@ function initChart(){
   });
   new ResizeObserver(()=>{ chart.applyOptions({width:$('chart').clientWidth,height:$('chart').clientHeight}); sizeCv(); }).observe($('chart'));
   chart.subscribeCrosshairMove(onCross);
-  $('chart').addEventListener('dblclick', resetView);
+  // 점 찍기는 DOM click 으로 받는다 (차트 자체 click 은 0.5초 안의 두 번째 클릭을 더블클릭으로 삼켜 버림). 드래그(6px 이상 이동)는 점 찍기에서 제외
+  { const el=$('chart'); let dn=null;
+    el.addEventListener('pointerdown',e=>{ dn={x:e.clientX,y:e.clientY}; },true);
+    el.addEventListener('click',e=>{
+      if(!tool) return;
+      if(dn && Math.hypot(e.clientX-dn.x,e.clientY-dn.y)>6) return;
+      const r=el.getBoundingClientRect(); onChartClick({point:{x:e.clientX-r.left,y:e.clientY-r.top}});
+    },true);
+  }
+  $('chart').addEventListener('dblclick', ()=>{ if(!tool) resetView(); });
 }
 function yfmt(v){ const s=BY[curId]||{dec:2}; const d = Math.abs(v)>=1000?Math.min(s.dec,2):s.dec; return v.toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d}); }
 const tv = v => mode==='pct' ? (v/base-1)*100 : v;
@@ -567,6 +576,7 @@ function liveTick(id, p, tms){
 }
 function liveBar(id, d){ /* 하이퍼리퀴드 1분봉 수신은 liveTick 이 처리 */ }
 function onCross(p){
+  onDrawHover(p);
   const tip = $('tip');
   if(!p.time || !p.point || p.point.x<0 || p.point.y<0){ tip.style.display='none'; return; }
   const b = byTime.get(p.time); if(!b){ tip.style.display='none'; return; }
@@ -655,7 +665,7 @@ function redraw(){
   if(!chart || !series) return;
   const L = plotSize(); cx.clearRect(0,0,L.W,L.H);
   if(!curId || !bars.length) return;
-  if(!smcOn || !smc || !view){ drawUser(L); drawCross(L); return; }
+  if(!smcOn || !smc || !view){ drawUser(L); return; }
   const lr = TS().getVisibleLogicalRange(); if(!lr){ drawUser(L); return; }
   const lo=lr.from-3, hi=lr.to+3, n=smc.n, last=n-1;
   cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip();
@@ -736,7 +746,7 @@ function redraw(){
     });
   });
   cx.restore();
-  drawUser(L); drawCross(L);
+  drawUser(L);
 }
 
 // ---------- 사용자 그리기 ----------
@@ -817,62 +827,47 @@ function hitTest(pos){
   });
   return best;
 }
-function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncSBtns(); redraw(); }
-function tipAtPos(pos){
-  const lg=TS().coordinateToLogical(pos.x), i=lg===null?-1:Math.round(lg);
-  if(i<0||i>=bars.length){ $('tip').style.display='none'; return; }
-  showTip(bars[i], bars[i].time+KST, pos.x, pos.y);
+function finish(){ pend=null; hover=null; tool=null; saveDraw(); syncSBtns(); $('tip').style.display='none'; redraw(); }
+// 그리기 입력은 차트 자체 이벤트로 받는다 (캔버스가 터치·드래그를 가로채지 않아 이동·핀치·더블클릭이 그대로 동작)
+function onChartClick(p){
+  if(!tool || !p || !p.point) return;
+  const pos = {x:p.point.x, y:p.point.y};
+  if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
+  const pt=mkPt(pos); if(!pt) return;
+  if(tool==='hline'||tool==='vline'){ drawings.push({k:curId,type:tool,a:pt}); finish(); return; }
+  if(!pend){ if(tool==='measure') meas=null; pend={type:tool,a:pt}; hover=pt; redraw(); return; }
+  if(pend.type==='measure'){ meas={a:pend.a,b:pt}; finish(); return; }
+  drawings.push({k:curId,type:pend.type,a:pend.a,b:pt}); finish();
 }
-// 그리기 도구를 켠 동안에는 캔버스가 마우스를 받으므로 크로스헤어·툴팁을 직접 그린다
-function drawCross(L){
-  if(!tool || !cross) return;
-  const v=series.coordinateToPrice(cross.y); if(v===null||cross.y>L.pb||cross.y<0) return;
-  const price=unconv(v), pct=(price/base-1)*100;
-  cx.save(); cx.beginPath(); cx.rect(0,0,L.pl,L.pb); cx.clip(); cx.strokeStyle='rgba(139,147,167,.7)'; cx.lineWidth=1; cx.setLineDash([4,4]);
-  cx.beginPath(); cx.moveTo(0,cross.y); cx.lineTo(L.pl,cross.y); cx.moveTo(cross.x,0); cx.lineTo(cross.x,L.pb); cx.stroke(); cx.restore(); cx.setLineDash([]);
-  const t = mode==='pct' ? sgn(pct) : fmtV(price)+'  '+sgn(pct);
-  cx.font='bold 11px sans-serif'; const w=cx.measureText(t).width+12, x0=L.W-w;
-  cx.fillStyle = pct>=0 ? '#7f1d1d' : '#1e3a8a'; cx.fillRect(x0,cross.y-9,L.W-x0,18);
-  cx.fillStyle = pct>=0 ? '#fca5a5' : '#93c5fd'; cx.textAlign='left'; cx.textBaseline='middle'; cx.fillText(t,x0+6,cross.y+1);
+function onDrawHover(p){
+  if(!tool) return;
+  if(!p || !p.point){ hover=null; hitD=null; redrawSoon(); return; }
+  const pos={x:p.point.x,y:p.point.y};
+  if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos);
+  redrawSoon();
 }
 function buildSMC(){
   $('smcopts').innerHTML = SOPTS.map(o=>'<button data-o="'+o[0]+'">'+o[1]+'</button>').join('');
   $('swl').value = String(swingLen);
   syncSBtns();
-  cv.addEventListener('mousemove',e=>{ const pos=evPos(e); if(tool==='erase') hitD=hitTest(pos); else hover=mkPt(pos); cross={x:pos.x,y:pos.y}; tipAtPos(pos); redrawSoon(); });
-  cv.addEventListener('mouseleave',()=>{ hover=null; hitD=null; cross=null; $('tip').style.display='none'; redrawSoon(); });
-  cv.addEventListener('wheel',e=>{   // 그리기 모드에서도 휠 줌 유지
-    e.preventDefault(); const pe=cv.style.pointerEvents; cv.style.pointerEvents='none';
-    const el=document.elementFromPoint(e.clientX,e.clientY); cv.style.pointerEvents=pe;
-    if(el) el.dispatchEvent(new WheelEvent('wheel',{clientX:e.clientX,clientY:e.clientY,deltaX:e.deltaX,deltaY:e.deltaY,deltaMode:e.deltaMode,bubbles:true,cancelable:true}));
-  },{passive:false});
-  cv.addEventListener('click',e=>{
-    const pos=evPos(e);
-    if(tool==='erase'){ const d=hitTest(pos); if(d){ drawings.splice(drawings.indexOf(d),1); saveDraw(); hitD=null; } redraw(); return; }
-    const pt=mkPt(pos); if(!pt||!tool) return;
-    if(tool==='hline'||tool==='vline'){ drawings.push({k:curId,type:tool,a:pt}); finish(); return; }
-    if(!pend){ if(tool==='measure') meas=null; pend={type:tool,a:pt}; hover=pt; redraw(); return; }
-    if(pend.type==='measure'){ meas={a:pend.a,b:pt}; finish(); return; }
-    drawings.push({k:curId,type:pend.type,a:pend.a,b:pt}); finish();
-  });
   document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&(tool||pend||meas)){ meas=null; tool=null; pend=null; hover=null; syncSBtns(); redraw(); } });
   $('dtools').addEventListener('click',e=>{ const bt=e.target.closest('button[data-d]'); const d=bt&&bt.dataset.d; if(!d) return; meas=null; tool=tool===d?null:d; pend=null; hover=null; hitD=null; syncSBtns(); redraw(); });
   $('undo').onclick=()=>{ for(let i=drawings.length-1;i>=0;i--){ if(drawings[i].k===curId){ drawings.splice(i,1); break; } } saveDraw(); redraw(); };
   $('clr').onclick=()=>{ drawings=drawings.filter(d=>d.k!==curId); saveDraw(); redraw(); };
-  $('smcM').onclick=()=>{ smcOn=!smcOn; saveS(); syncSBtns(); redraw(); };
+  $('smcM').onclick=()=>{ smcOn=!smcOn; saveS(); syncSBtns(); if(son.trend) render(); redraw(); };
   $('smcopts').addEventListener('click',e=>{
     const k=e.target.dataset.o; if(!k) return; son[k]=!son[k]; saveS(); syncSBtns();
     if(k==='trend'){ render(); } redraw();
   });
   $('smode').addEventListener('click',e=>{ const m=e.target.dataset.sm; if(!m) return; smode=m; saveS(); syncSBtns(); buildView(); redraw(); });
-  $('swl').onchange=e=>{ swingLen=+e.target.value; saveS(); recomputeSMC(); redraw(); };
+  $('swl').onchange=e=>{ swingLen=+e.target.value; saveS(); recomputeSMC(); if(son.trend) render(); redraw(); };
   // 가격축 드래그 등으로 눈금이 바뀌면 오버레이를 다시 그린다
   let sig='';
   (function loop(){
     requestAnimationFrame(loop);
     if(!chart||!series||!curId) return;
     const lr=TS().getVisibleLogicalRange();
-    const s=[lr?lr.from.toFixed(2)+','+lr.to.toFixed(2):'', series.priceToCoordinate(tv(base)), series.priceToCoordinate(tv(base*1.01)), $('chart').clientWidth, $('chart').clientHeight, bars.length, bars.length?bars[bars.length-1].c:0, mode, tf, curId].join('|');
+    const s=[lr?lr.from.toFixed(2)+','+lr.to.toFixed(2):'', series.priceToCoordinate(tv(base)), series.priceToCoordinate(tv(base*1.01)), $('chart').clientWidth, $('chart').clientHeight, bars.length, mode, tf, curId].join('|');
     if(s!==sig){ sig=s; redraw(); }
   })();
 }
@@ -881,7 +876,7 @@ function syncSBtns(){
   document.querySelectorAll('#smcopts button').forEach(b=>b.classList.toggle('on',!!son[b.dataset.o]));
   document.querySelectorAll('#smode button').forEach(b=>b.classList.toggle('on',b.dataset.sm===smode));
   document.querySelectorAll('#dtools button[data-d]').forEach(b=>b.classList.toggle('on',b.dataset.d===tool));
-  cv.classList.toggle('act',!!tool);
+  $('cwrap').classList.toggle('tool',!!tool);
 }
 
 // ---- 화면 전환 ----
@@ -903,7 +898,7 @@ function buildUI(){
   buildRows(); buildTools(); buildAdd(); buildSMC();
   const g = $('tfs');
   TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
-    b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); loadChart(false); }; g.appendChild(b); });
+    b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); bars=[]; byTime=new Map(); smc=null; view=null; if(series) series.setData([]); redraw(); loadChart(false); }; g.appendChild(b); });
   document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{ mode=b.dataset.m;
     document.querySelectorAll('[data-m]').forEach(x=>x.classList.toggle('on',x===b)); render(); });
   $('reset').onclick = ()=>{ loadChart(false); };
