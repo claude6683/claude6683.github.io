@@ -23,12 +23,19 @@ jobs:
           node-version: "20"
       - name: load previous state
         run: |
-          git fetch --depth=1 origin ai-data 2>/dev/null && git show FETCH_HEAD:ai.json > ai_state.json || echo "no previous state"
+          if git ls-remote --exit-code --heads origin ai-data >/dev/null 2>&1; then
+            git fetch --depth=1 origin ai-data
+            git show FETCH_HEAD:ai.json > ai_state.json
+          else
+            echo "no previous state (first run)"
+          fi
       - name: run engine
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/ai_trade.js ai_state.json out/ai.json
       - name: publish ai-data branch
+        env:
+          GH_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd out
           git init -q -b ai-data
@@ -36,4 +43,4 @@ jobs:
           git config user.email "github-actions@users.noreply.github.com"
           git add ai.json
           git commit -qm "ai state"
-          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ai-data
+          git push -f "https://x-access-token:${GH_PUSH_TOKEN}@github.com/${{ github.repository }}.git" ai-data

@@ -39,14 +39,7 @@ async function fetchBars() {
       return j.map(x => ({ t: Math.floor(x[0] / 1000), o: +x[1], h: +x[2], l: +x[3], c: +x[4] }));
     } catch (e) { console.log('data source failed:', u.split('/')[2], e.message); }
   }
-  // 마지막 수단: Hyperliquid BTC 선물 (가격이 현물과 약간 다를 수 있음)
-  const now = Date.now();
-  const j = await getJSON('https://api.hyperliquid.xyz/info', {
-    method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ type: 'candleSnapshot', req: { coin: 'BTC', interval: '1h', startTime: now - 1000 * TF_SEC * 1000, endTime: now } }),
-  });
-  console.log('using hyperliquid fallback');
-  return j.map(x => ({ t: Math.floor(x.t / 1000), o: +x.o, h: +x.h, l: +x.l, c: +x.c }));
+  throw new Error('all data sources failed');   // 가격 출처를 섞지 않는다: 이번 실행은 건너뛰고 다음에 따라잡음
 }
 
 // ---------------- indicators ----------------
@@ -167,11 +160,11 @@ function closePos(a, t, price, why, detail) {
 function manage(a, b) {
   const p = a.pos; if (!p || b.t <= p.t) return;
   if (p.side === 'L') {
-    if (b.l <= p.stop) return closePos(a, b.t, p.stop, p.be ? '본전스탑' : '손절', `${kst(b.t)} 가격이 손절선 ${f0(p.stop)}에 닿아 청산${p.be ? '(본전 이동 후)' : ''}.`);
+    if (b.l <= p.stop) return closePos(a, b.t, Math.min(p.stop, b.o), p.be ? '본전스탑' : '손절', `${kst(b.t)} 가격이 손절선 ${f0(p.stop)}에 닿아 청산${p.be ? '(본전 이동 후)' : ''}.`);
     if (b.h >= p.target) return closePos(a, b.t, p.target, '목표달성', `${kst(b.t)} 가격이 목표 ${f0(p.target)}에 도달해 익절.`);
     if (!p.be && b.h >= p.entry + p.r0) { p.be = true; p.stop = Math.max(p.stop, p.entry); }
   } else {
-    if (b.h >= p.stop) return closePos(a, b.t, p.stop, p.be ? '본전스탑' : '손절', `${kst(b.t)} 가격이 손절선 ${f0(p.stop)}에 닿아 청산${p.be ? '(본전 이동 후)' : ''}.`);
+    if (b.h >= p.stop) return closePos(a, b.t, Math.max(p.stop, b.o), p.be ? '본전스탑' : '손절', `${kst(b.t)} 가격이 손절선 ${f0(p.stop)}에 닿아 청산${p.be ? '(본전 이동 후)' : ''}.`);
     if (b.l <= p.target) return closePos(a, b.t, p.target, '목표달성', `${kst(b.t)} 가격이 목표 ${f0(p.target)}에 도달해 익절.`);
     if (!p.be && b.l <= p.entry - p.r0) { p.be = true; p.stop = Math.min(p.stop, p.entry); }
   }
@@ -240,7 +233,7 @@ function validateClaude(S, d, acct) {
   const lastIdx = bars.length - 1;
 
   let st = null;
-  try { st = JSON.parse(fs.readFileSync(STATE_IN, 'utf8')); } catch (e) { /* first run */ }
+  if (fs.existsSync(STATE_IN)) st = JSON.parse(fs.readFileSync(STATE_IN, 'utf8'));   // 깨진 파일이면 예외 → 실행 중단(덮어쓰기 방지)
   if (!st || !st.accounts) {
     const s0 = bars[lastIdx - 1];   // 시작점 = 직전 봉 → 최신 봉부터 바로 판단 시작
     st = { version: 1, symbol: SYMBOL, tf: '1h', startEquity: START_EQUITY, startT: s0.t, startPrice: s0.c, lastT: s0.t, updated: 0,
@@ -255,10 +248,11 @@ function validateClaude(S, d, acct) {
   const A = st.accounts.A, B = st.accounts.B, C = st.accounts.C;
   const newIdx = [];
   for (let i = 0; i <= lastIdx; i++) if (bars[i].t > st.lastT) newIdx.push(i);
-  if (newIdx.length > 200) newIdx.splice(0, newIdx.length - 200);  // 오래 멈췄다 재개한 경우 최근 200봉만 처리
 
   for (const i of newIdx) {
-    const b = bars[i], S = snapshot(bars, i), isLast = i === lastIdx;
+    const b = bars[i];
+    if (i < lastIdx - 200) { [A, B, C].forEach(a => { manage(a, b); a.curve.push([b.t, +markEq(a, b.c).toFixed(2)]); }); st.px.push([b.t, b.c]); st.lastT = b.t; continue; }  // 오래 멈췄던 구간: 손절·목표만 처리
+    const S = snapshot(bars, i), isLast = i === lastIdx;
     // 1) 보유 포지션 손절·목표 처리
     [A, B, C].forEach(a => manage(a, b));
     // 2) 규칙 전략: 구조 전환(스윙 CHoCH) 시 청산
@@ -291,7 +285,8 @@ function validateClaude(S, d, acct) {
       if (d.action === 'BUY' || d.action === 'SELL') openPos(a, S, d, d.action === 'BUY' ? 'L' : 'S');
     }
     // 5) B: Claude 직접 판단 (최신 봉에서만 호출, 나머지는 손절/목표만 처리)
-    if (isLast && KEY) {
+    if (isLast && KEY && B.cool > 0) { B.cool--; B.status = { t: b.t, action: 'HOLD', text: `청산 직후 재진입 대기(${B.cool}봉 남음).` }; }
+    else if (isLast && KEY) {
       try {
         const raw = await askClaude(SYS_TRADE, ctxText(bars, S, B), 700);
         const d = validateClaude(S, raw, B);
