@@ -1,6 +1,5 @@
 /* AI 자동매매(모의) 엔진 — BTCUSDT 1H, 전략 3개를 같은 가격으로 동시에 돌려 비교
  *  A: 규칙(SMC+EMA200+RSI+ATR)        — Claude 호출 없음
- *  B: Claude 직접 판단(매 1H봉)        — ANTHROPIC_API_KEY 필요
  *  C: 규칙 A + 하루 1번 Claude 총평이 방향(stance)을 제한 — 키 없으면 A와 동일
  * 모의거래: 실제 주문 없음. 수수료 0.05%/편도 + 슬리피지 0.02% 가정.
  * 상태는 ai-data 브랜치의 ai.json 에 저장(워크플로가 읽고 다시 씀).
@@ -239,22 +238,22 @@ function validateClaude(S, d, acct) {
     st = { version: 1, symbol: SYMBOL, tf: '1h', startEquity: START_EQUITY, startT: s0.t, startPrice: s0.c, lastT: s0.t, updated: 0,
       px: [[s0.t, s0.c]], accounts: {
         A: newAcct('A', 'A · 규칙 (SMC+EMA+RSI+ATR)', '사람이 정한 규칙을 코드가 기계적으로 실행. Claude 호출 없음.'),
-        B: newAcct('B', 'B · Claude 직접 판단', '매 1시간봉마다 Claude가 직접 지표를 골라 판단(API 키 필요).'),
         C: newAcct('C', 'C · 규칙 + 일일 Claude 총평', 'A와 같은 규칙이되, 하루 1번 Claude가 정한 방향(롱만/숏만/양방향/쉬기)만 허용.'),
       }, daily: { t: 0, day: -1, stance: 'BOTH', text: '총평 전' }, notes: [] };
     for (const k of Object.keys(st.accounts)) st.accounts[k].curve.push([s0.t, START_EQUITY]);
     console.log('first run: start at', kst(s0.t), s0.c);
   }
-  const A = st.accounts.A, B = st.accounts.B, C = st.accounts.C;
+  delete st.accounts.B;   // B(Claude 직접 판단) 폐기: 유료 API라서 제거
+  const A = st.accounts.A, C = st.accounts.C;
   const newIdx = [];
   for (let i = 0; i <= lastIdx; i++) if (bars[i].t > st.lastT) newIdx.push(i);
 
   for (const i of newIdx) {
     const b = bars[i];
-    if (i < lastIdx - 200) { [A, B, C].forEach(a => { manage(a, b); a.curve.push([b.t, +markEq(a, b.c).toFixed(2)]); }); st.px.push([b.t, b.c]); st.lastT = b.t; continue; }  // 오래 멈췄던 구간: 손절·목표만 처리
+    if (i < lastIdx - 200) { [A, C].forEach(a => { manage(a, b); a.curve.push([b.t, +markEq(a, b.c).toFixed(2)]); }); st.px.push([b.t, b.c]); st.lastT = b.t; continue; }  // 오래 멈췄던 구간: 손절·목표만 처리
     const S = snapshot(bars, i), isLast = i === lastIdx;
     // 1) 보유 포지션 손절·목표 처리
-    [A, B, C].forEach(a => manage(a, b));
+    [A, C].forEach(a => manage(a, b));
     // 2) 규칙 전략: 구조 전환(스윙 CHoCH) 시 청산
     [A, C].forEach(a => {
       if (a.pos && S.swingChoch && ((a.pos.side === 'L' && !S.swingChoch.bull) || (a.pos.side === 'S' && S.swingChoch.bull)))
@@ -284,36 +283,17 @@ function validateClaude(S, d, acct) {
       a.status = { t: b.t, action: d.action, text: d.reason };
       if (d.action === 'BUY' || d.action === 'SELL') openPos(a, S, d, d.action === 'BUY' ? 'L' : 'S');
     }
-    // 5) B: Claude 직접 판단 (최신 봉에서만 호출, 나머지는 손절/목표만 처리)
-    if (isLast && KEY && B.cool > 0) { B.cool--; B.status = { t: b.t, action: 'HOLD', text: `청산 직후 재진입 대기(${B.cool}봉 남음).` }; }
-    else if (isLast && KEY) {
-      try {
-        const raw = await askClaude(SYS_TRADE, ctxText(bars, S, B), 700);
-        const d = validateClaude(S, raw, B);
-        if (d.action === 'BUY' || d.action === 'SELL') openPos(B, S, d, d.action === 'BUY' ? 'L' : 'S', { riskPct: d.riskPct });
-        else if (d.action === 'CLOSE') closePos(B, b.t, b.c, 'Claude 청산', d.reason);
-        else if (d.action === 'ADJUST_STOP') { B.pos.stop = d.stop; B.events.push({ t: b.t, type: 'ADJUST', price: d.stop, reason: d.reason }); }
-        const p = B.pos;
-        B.status = { t: b.t, action: d.action === 'HOLD' && p ? 'HOLDING' : d.action, text: d.reason + (p && d.action === 'HOLD' ? ` (보유 중: ${p.side === 'L' ? '롱' : '숏'} ${f0(p.entry)}, 손절 ${f0(p.stop)}, 목표 ${f0(p.target)})` : '') };
-        B.errors = 0;
-      } catch (e) {
-        B.errors++; B.status = { t: b.t, action: 'HOLD', text: 'Claude 호출 실패(' + e.message + ') — 이번 봉은 관망. 연속 실패 ' + B.errors + '회' };
-        console.log('B failed:', e.message);
-      }
-    } else if (isLast && !KEY) {
-      B.status = { t: b.t, action: 'IDLE', text: 'ANTHROPIC_API_KEY가 저장소 Secret에 없어 대기 중. 키가 등록되면 다음 실행부터 Claude가 직접 매매한다.' };
-      C.status.text += '  [참고: Claude 키가 없어 총평 없이 A와 같은 규칙으로 동작 중]';
-    }
+    if (isLast && !KEY) C.status.text += '  [참고: Claude 키가 없어 총평 없이 A와 같은 규칙으로 동작 중]';
     // 6) 자산곡선(종가 기준 평가)
-    [A, B, C].forEach(a => a.curve.push([b.t, +markEq(a, b.c).toFixed(2)]));
+    [A, C].forEach(a => a.curve.push([b.t, +markEq(a, b.c).toFixed(2)]));
     st.px.push([b.t, b.c]);
     st.lastT = b.t;
   }
   // 오래된 곡선·이벤트 정리(파일 크기 관리)
-  [A, B, C].forEach(a => { if (a.curve.length > 4000) a.curve = a.curve.slice(-4000); if (a.events.length > 600) a.events = a.events.slice(-600); if (a.trades.length > 600) a.trades = a.trades.slice(-600); });
+  [A, C].forEach(a => { if (a.curve.length > 4000) a.curve = a.curve.slice(-4000); if (a.events.length > 600) a.events = a.events.slice(-600); if (a.trades.length > 600) a.trades = a.trades.slice(-600); });
   if (st.px.length > 4000) st.px = st.px.slice(-4000);
   st.updated = nowS; st.lastPrice = bars[lastIdx].c;
   fs.mkdirSync(path.dirname(STATE_OUT), { recursive: true });
   fs.writeFileSync(STATE_OUT, JSON.stringify(st));
-  console.log('done. processed bars:', newIdx.length, 'last', kst(st.lastT), 'equity A/B/C:', [A, B, C].map(a => f0(markEq(a, bars[lastIdx].c))).join(' / '), 'events', [A, B, C].map(a => a.events.length).join('/'));
+  console.log('done. processed bars:', newIdx.length, 'last', kst(st.lastT), 'equity A/C:', [A, C].map(a => f0(markEq(a, bars[lastIdx].c))).join(' / '), 'events', [A, C].map(a => a.events.length).join('/'));
 })().catch(e => { console.error('FATAL', e.message); process.exit(1); });
