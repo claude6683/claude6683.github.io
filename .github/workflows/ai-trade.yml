@@ -30,8 +30,6 @@ jobs:
             echo "no previous state (first run)"
           fi
       - name: run engine
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: node scripts/ai_trade.js ai_state.json out/ai.json
       - name: publish ai-data branch
         env:
