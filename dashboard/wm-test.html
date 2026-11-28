@@ -48,7 +48,9 @@
   /* 5분봉 워터마크 (테스트) */
   .mon-k{position:relative;overflow:hidden}
   .mon-k>*{position:relative;z-index:1}
-  .mon-k>.wm{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  .mon-k.wmk{justify-content:flex-start;gap:0}
+  .mon-tx{height:52%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .mon-k>.wm{position:absolute;left:0;right:0;bottom:0;width:100%;height:46%;z-index:0;pointer-events:none}
   .mon-t{font-size:calc(clamp(14px,1.7vw,24px) * var(--ms,1));font-weight:800;letter-spacing:.5px}
   .mon-v{font-size:calc(clamp(12px,1.35vw,18px) * var(--ms,1));font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
   .mon-p{font-size:calc(clamp(13px,1.5vw,20px) * var(--ms,1));font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
@@ -212,25 +214,25 @@ function monPrice(t,p){
   const s = (n===0?Math.floor(p):p).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});
   return t==='US10Y' ? s+'%' : s;
 }
-const WM = {};                                    // 이름 -> 5분봉 종가 배열
+const WM = {};                                    // 이름 -> 1분봉 종가 배열(최근 4시간)
 function wmSvg(k){
   const v = WM[k]; if(!v || v.length<2) return '';
-  const w=300, h=100, pt=14, pb=14, mn=Math.min(...v), mx=Math.max(...v), sp=(mx-mn)||1;
+  const w=300, h=100, pt=10, pb=8, mn=Math.min(...v), mx=Math.max(...v), sp=(mx-mn)||1;
   const pts = v.map((x,i)=>(i*w/(v.length-1)).toFixed(1)+','+(pt+(1-(x-mn)/sp)*(h-pt-pb)).toFixed(1)).join(' ');
   return '<svg class="wm" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-hidden="true">'+
     '<polygon points="0,'+h+' '+pts+' '+w+','+h+'" fill="currentColor" opacity=".13"/>'+
-    '<polyline points="'+pts+'" fill="none" stroke="currentColor" stroke-width="2.6" opacity=".8" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+    '<polyline points="'+pts+'" fill="none" stroke="currentColor" stroke-width="2.2" opacity=".9" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>';
 }
 async function loadWm(k){
   let c = null;
   try{                                              // 1순위 바이낸스 5분봉 24시간(288개)
-    const r = await fetch('https://api.binance.com/api/v3/klines?symbol='+k+'USDT&interval=5m&limit=288');
+    const r = await fetch('https://api.binance.com/api/v3/klines?symbol='+k+'USDT&interval=1m&limit=240');
     if(r.ok){ const a = await r.json(); c = a.map(x=>+x[4]); }
   }catch(e){}
   if(!c || c.length<20){                            // 2순위 하이퍼리퀴드
     try{
       const now = Date.now();
-      const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'candleSnapshot',req:{coin:k,interval:'5m',startTime:now-864e5,endTime:now}})});
+      const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'candleSnapshot',req:{coin:k,interval:'1m',startTime:now-4*36e5,endTime:now}})});
       const a = await r.json(); c = a.map(x=>+x.c);
     }catch(e){}
   }
@@ -243,8 +245,9 @@ function drawMon(){
     const c = x.c, has = typeof c==='number';
     const cls = !has?'na':c>0?'up':c<0?'dn':'flat';
     const sign = !has?'':c>0?'+':c<0?'−':'';
-    return '<div class="mon-k '+cls+'">'+wmSvg(k)+'<div class="mon-t">'+esc(label)+'</div><div class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</div>'+
-      '<div class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</div></div>';
+    const wm = wmSvg(k);
+    return '<div class="mon-k '+cls+(wm?' wmk':'')+'">'+(wm?'<div class="mon-tx">':'')+'<div class="mon-t">'+esc(label)+'</div><div class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</div>'+
+      '<div class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</div>'+(wm?'</div>'+wm:'')+'</div>';
   }).join('');
 }
 function loadMon(){
