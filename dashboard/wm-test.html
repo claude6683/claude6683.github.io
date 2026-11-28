@@ -264,7 +264,7 @@ async function loadWm(k){
   if(sOK(s)){ WM[k] = s.map(x=>x.c); drawMon(); }
 }
 const WM_FAST = ['BTC','XYZ100','SPCX'], WM_SLOW = Object.keys(WSRC).filter(k=>WM_FAST.indexOf(k)<0);
-function loadWmAll(list){ if(document.hidden) return; list.forEach(k=>loadWm(k)); }
+function loadWmAll(list,force){ if(document.hidden && !force) return; list.forEach(k=>loadWm(k)); }
 function drawMon(){
   $('monG').innerHTML = ORDER.map(k=>{
     const x = MON[k] || (k==='KOSPI' && MON['KOSPI 야간']) || {};
@@ -314,7 +314,7 @@ async function loadSpcx(){
   }catch(e){}
 }
 drawMon(); loadMon(); loadXyz(); loadSpcx();
-loadWmAll(WM_FAST); loadWmAll(WM_SLOW); setInterval(()=>loadWmAll(WM_FAST), 30000); setInterval(()=>loadWmAll(WM_SLOW), 120000);
+loadWmAll(WM_FAST,1); loadWmAll(WM_SLOW,1); document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadWmAll(WM_FAST); loadWmAll(WM_SLOW); } }); setInterval(()=>loadWmAll(WM_FAST), 30000); setInterval(()=>loadWmAll(WM_SLOW), 120000);
 setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 15000);
 
 /* ---------- B-3 뉴스 (코인속보 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
