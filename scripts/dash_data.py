@@ -72,7 +72,9 @@ def flow_news(n=4):
         lines = [x.strip() for x in txt.split("\n") if x.strip()]
         if not lines:
             continue
-        t = lines[0]
+        t = re.sub(r"\s*[—–-]*\s*🔗.*$", "", lines[0]).strip()   # 끝의 "—🔗link" 제거
+        if not t:
+            continue
         if len(t) > 140:
             t = t[:139] + "…"
         try:
