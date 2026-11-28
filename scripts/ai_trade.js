@@ -6,7 +6,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { computeSMC } = require('../smc/smc-engine.js');
+const { computeSMC } = require('../ai/smc-engine.js');
 
 const TF_SEC = 3600;
 const START_EQUITY = 100000;          // 종목당 시작 모의자금

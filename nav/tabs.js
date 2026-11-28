@@ -7,7 +7,6 @@
     ['/dashboard/', 'Main','Main'],
     ['/fractal-chart/', 'F.chart','F.chart'],
     ['/overview/', 'O.View','O.View'],
-    ['/smc/', 'Chart','Chart'],
     ['/ai/', 'AI','AI'],
     ['/fishing/', 'Fish','Fish'],
     ['/divergence/', 'Index','Index'],
