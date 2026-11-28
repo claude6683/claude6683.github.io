@@ -214,7 +214,7 @@ function monPrice(t,p){
   const s = (n===0?Math.floor(p):p).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});
   return t==='US10Y' ? s+'%' : s;
 }
-const WM = {};                                    // 이름 -> 1분봉 종가 배열(최근 4시간)
+const WM = {};                                    // 이름 -> 1분봉 종가 배열(최근 1시간)
 function wmSvg(k){
   const v = WM[k]; if(!v || v.length<2) return '';
   const w=300, h=100, pt=10, pb=8, mn=Math.min(...v), mx=Math.max(...v), sp=(mx-mn)||1;
@@ -226,17 +226,17 @@ function wmSvg(k){
 async function loadWm(k){
   let c = null;
   try{                                              // 1순위 바이낸스 5분봉 24시간(288개)
-    const r = await fetch('https://api.binance.com/api/v3/klines?symbol='+k+'USDT&interval=1m&limit=240');
+    const r = await fetch('https://api.binance.com/api/v3/klines?symbol='+k+'USDT&interval=1m&limit=60');
     if(r.ok){ const a = await r.json(); c = a.map(x=>+x[4]); }
   }catch(e){}
-  if(!c || c.length<20){                            // 2순위 하이퍼리퀴드
+  if(!c || c.length<10){                            // 2순위 하이퍼리퀴드
     try{
       const now = Date.now();
-      const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'candleSnapshot',req:{coin:k,interval:'1m',startTime:now-4*36e5,endTime:now}})});
+      const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'candleSnapshot',req:{coin:k,interval:'1m',startTime:now-36e5,endTime:now}})});
       const a = await r.json(); c = a.map(x=>+x.c);
     }catch(e){}
   }
-  if(c && c.length>=20 && c.every(isFinite)){ WM[k] = c; drawMon(); }
+  if(c && c.length>=10 && c.every(isFinite)){ WM[k] = c; drawMon(); }
 }
 function drawMon(){
   $('monG').innerHTML = ORDER.map(k=>{
