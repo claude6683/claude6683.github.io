@@ -1,4 +1,4 @@
-/* #6683 공통 탭바 — 12개 페이지 어디서든 상단에서 이동 / 드래그로 순서 변경 (순서는 이 브라우저에 저장) */
+/* #6683 공통 탭바 — 13개 페이지 어디서든 상단에서 이동 / 드래그로 순서 변경 (순서는 이 브라우저에 저장) */
 (function () {
   if (window.__tabs6683) return;
   window.__tabs6683 = 1;
@@ -8,6 +8,7 @@
     ['/fractal-chart/', 'fractal-chart','Fractal'],
     ['/overview/', 'overview','Overview'],
     ['/smc/', 'SMC','SMC'],
+    ['/ai/', 'AI 자동매매','AI'],
     ['/fishing/', 'Fishing','Fish'],
     ['/divergence/', 'INDEX','INDEX'],
     ['/xyz100/', 'NASDAQ LIVE','NQ LIVE'],

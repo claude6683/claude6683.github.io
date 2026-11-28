@@ -1,0 +1,39 @@
+name: ai-trade
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # 지연돼도 괜찮음: 엔진이 놓친 1시간봉을 순서대로 따라잡는다
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ai-trade
+  cancel-in-progress: false
+
+jobs:
+  trade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: load previous state
+        run: |
+          git fetch --depth=1 origin ai-data 2>/dev/null && git show FETCH_HEAD:ai.json > ai_state.json || echo "no previous state"
+      - name: run engine
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: node scripts/ai_trade.js ai_state.json out/ai.json
+      - name: publish ai-data branch
+        run: |
+          cd out
+          git init -q -b ai-data
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add ai.json
+          git commit -qm "ai state"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ai-data
