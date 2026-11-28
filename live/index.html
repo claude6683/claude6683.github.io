@@ -64,7 +64,7 @@
   #lastp{position:absolute;right:4px;top:0;z-index:5;padding:2px 8px;border-radius:4px;color:#fff;font-weight:700;font-variant-numeric:tabular-nums;pointer-events:none;display:none;white-space:nowrap}
   #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(22,26,33,.95);border:1px solid #3a4254;border-radius:6px;padding:6px 9px;font-size:.75rem;line-height:1.5;font-variant-numeric:tabular-nums;white-space:nowrap}
   #cmsg{position:absolute;left:0;right:0;top:40%;text-align:center;color:var(--sub);font-size:.875rem;pointer-events:none}
-  #cnote{flex:none;padding:6px 12px;border-top:1px solid var(--line);font-size:.6875rem;color:var(--sub)}
+  #cnote{flex:none;padding:1px 8px;border-top:1px solid var(--line);font-size:7px;line-height:1.2;color:#5b6475}
   #back{display:none}
 
   /* 도구줄 / 편집 */
@@ -143,7 +143,7 @@
     <div class="sbar" id="smcbar"><span class="lbl">SMC</span><button id="smcM">표시</button><div class="grp" id="smcopts"></div><span class="lbl">스윙길이</span><select id="swl"><option>10</option><option>20</option><option>50</option><option>100</option></select><span class="lbl">모드</span><div class="grp" id="smode"><button data-sm="hist">과거전체</button><button data-sm="pres">현재만</button></div></div>
     <div class="sbar" id="drawbar"><span class="lbl">그리기</span><div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button><button id="layBtn" title="차트 분할 (1개 / 2개)"></button></div></div>
     <div id="cwrap"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div><div id="lastp"></div><div id="cmsg"></div></div>
-    <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 가격축 위아래 드래그 = 세로 확대·축소, 더블클릭 초기화 · 상승 빨강 / 하락 파랑<br>SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전입니다. 원본과 100% 같지 않을 수 있으며 투자 권유가 아닙니다.</div>
+    <div id="cnote">SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전. 원본과 같지 않을 수 있으며 투자 권유 아님.</div>
   </section>
   <iframe id="pane2" title="두 번째 차트" loading="lazy"></iframe>
   </div>
