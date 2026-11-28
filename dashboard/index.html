@@ -45,6 +45,18 @@
   .mon-k{border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:90px;
          background:linear-gradient(160deg,#262a31 0%,#181b20 55%,#121418 100%);
          box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -4px 0 rgba(0,0,0,.45),0 6px 14px rgba(0,0,0,.5);border:1px solid #2a2f37}
+  /* 전광판 종목별 1분봉(최근 1시간) 워터마크: 위 글자 / 아래 라인 */
+  .mon-k{position:relative;overflow:hidden}
+  .mon-k>*{position:relative;z-index:1}
+  .mon-k.wmk{justify-content:flex-start;gap:0}
+  .mon-tx{height:52%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .mon-k>.wm{position:absolute;left:0;right:0;bottom:0;width:100%;height:46%;z-index:0;pointer-events:none}
+  /* 상단 줄: 전광판(정사각형) + 뉴스(남는 자리) */
+  .c2{grid-template-columns:min(58%,960px) minmax(0,1fr)}
+  #c-mon{aspect-ratio:1/1}
+  #c-news{contain:size}
+  .row.max #c-mon{aspect-ratio:auto}
+  .row.max .c2{height:calc(100vh - 60px)}
   .mon-t{font-size:calc(clamp(14px,1.7vw,24px) * var(--ms,1));font-weight:800;letter-spacing:.5px}
   .mon-v{font-size:calc(clamp(12px,1.35vw,18px) * var(--ms,1));font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
   .mon-p{font-size:calc(clamp(13px,1.5vw,20px) * var(--ms,1));font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
@@ -94,6 +106,11 @@
   footer{margin-top:10px;font-size:12px;color:var(--sub);border-top:1px solid var(--line);padding-top:10px}
   @media(max-width:900px){
     .c3{grid-template-columns:1fr;height:auto}
+    .c2{grid-template-columns:1fr}
+    #c-news{contain:none;height:420px}
+    #c-mon{aspect-ratio:auto}
+    #c-mon .mon-g{height:auto}
+    #c-mon .mon-k{min-height:128px}
     .c3>.cell,.c3>.stack{min-height:380px}
     .stack>.cell{min-height:380px}
     #row3 .cells{height:auto}
@@ -108,16 +125,11 @@
 
   <!-- 상단 1줄 : 3칸 (33.3% x 3) -->
   <section class="row" id="row1">
-    <div class="rh"><span class="rt">상단 · 시세 / 차트 / 뉴스</span><button class="xb" data-x="row">⤢</button></div>
-    <div class="cells c3">
+    <div class="rh"><span class="rt">상단 · 시세 / 뉴스</span><button class="xb" data-x="row">⤢</button></div>
+    <div class="cells c2">
       <div class="cell" id="c-mon">
         <div class="ch"><span>시세 전광판<small id="monAt"></small></span><span style="display:flex;gap:4px"><button class="xb" id="msm">−</button><button class="xb" id="mbg">+</button><button class="xb">⤢</button></span></div>
         <div class="cb"><div class="mon-g" id="monG"></div></div>
-      </div>
-      <div class="stack">
-        <div class="cell"><div class="ch"><span>BTC · SMC</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-smc.html?s=BTC"></iframe></div></div>
-        <div class="cell"><div class="ch"><span>XYZ100USDC · SMC</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-smc.html?s=XYZ100"></iframe></div></div>
-        <div class="cell"><div class="ch"><span>overview</span><button class="xb">⤢</button></div><div class="cb"><iframe src="c-ov.html"></iframe></div></div>
       </div>
       <div class="cell" id="c-news">
         <div class="ch"><span>News<small>코인속보 4 · 미증시 3 · 한국증시 3 · 코인 3</small></span><button class="xb">⤢</button></div>
@@ -208,6 +220,54 @@ function monPrice(t,p){
   const s = (n===0?Math.floor(p):p).toLocaleString('en-US',{minimumFractionDigits:n,maximumFractionDigits:n});
   return t==='US10Y' ? s+'%' : s;
 }
+/* 종목별 1분봉 워터마크 (최근 60개). 코인은 거래소 직결, 주식·지수·환율은 live-quotes Worker(야후) 중계 */
+const WORKER = 'https://live-quotes.nikemix99.workers.dev';
+const WM = {};                                    // 이름 -> 종가 배열
+const WSRC = {'BTC':{bn:'BTCUSDT',hl:'BTC'},'XYZ100':{hl:'xyz:XYZ100'},'SPCX':{hl:'xyz:SPCX'},
+  'S&P':{yf:'ES=F'},'SCHG':{yf:'SCHG'},'SCHD':{yf:'SCHD'},'US10Y':{yf:'^TNX'},'KOSPI':{yf:'^KS11'},
+  'USDKRW':{yf:'KRW=X'},'GOLD':{yf:'GC=F'},'WTI':{yf:'CL=F'},'KIMP':{kimp:1}};
+function wmSvg(k){
+  const v = WM[k]; if(!v || v.length<2) return '';
+  const w=300, h=100, pt=10, pb=8, mn=Math.min(...v), mx=Math.max(...v), sp=(mx-mn)||1;
+  const pts = v.map((x,i)=>(i*w/(v.length-1)).toFixed(1)+','+(pt+(1-(x-mn)/sp)*(h-pt-pb)).toFixed(1)).join(' ');
+  return '<svg class="wm" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" aria-hidden="true">'+
+    '<polygon points="0,'+h+' '+pts+' '+w+','+h+'" fill="currentColor" opacity=".13"/>'+
+    '<polyline points="'+pts+'" fill="none" stroke="currentColor" stroke-width="2.2" opacity=".9" vector-effect="non-scaling-stroke" stroke-linejoin="round" stroke-linecap="round"/></svg>';
+}
+const jget = async u => { const r = await fetch(u); if(!r.ok) throw new Error(r.status); return r.json(); };
+const sOK = a => Array.isArray(a) && a.length>=10 && a.every(x=>isFinite(x.c));
+async function serHl(coin){
+  const now = Date.now();
+  const r = await fetch('https://api.hyperliquid.xyz/info',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type:'candleSnapshot',req:{coin:coin,interval:'1m',startTime:now-6*36e5,endTime:now}})});
+  return (await r.json()).map(x=>({t:x.t/1000,c:+x.c})).slice(-60);
+}
+async function serBn(sym,n){ return (await jget('https://api.binance.com/api/v3/klines?symbol='+sym+'&interval=1m&limit='+n)).map(x=>({t:x[0]/1000,c:+x[4]})); }
+async function serYf(sym){
+  const u = 'https://query1.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(sym)+'?range=1d&interval=1m&includePrePost=true';
+  const j = await jget(WORKER+'/?u='+encodeURIComponent(u)), r = j.chart.result[0];
+  const ts = r.timestamp||[], cl = r.indicators.quote[0].close||[], o = [];
+  for(let i=0;i<ts.length;i++) if(cl[i]!=null && isFinite(cl[i])) o.push({t:ts[i],c:+cl[i]});
+  return o;                                         // 장이 닫혀 있으면 마지막 장의 데이터
+}
+async function serKimp(){                           // 업비트 BTC(원) ÷ (바이낸스 BTC(달러) × 환율) − 1
+  const up = (await jget(WORKER+'/?u='+encodeURIComponent('https://api.upbit.com/v1/candles/minutes/1?market=KRW-BTC&count=60'))).map(x=>({t:Date.parse(x.candle_date_time_utc+'Z')/1000,c:+x.trade_price}));
+  const [bn,fx] = await Promise.all([serBn('BTCUSDT',90),serYf('KRW=X')]);
+  const bm = {}; bn.forEach(x=>{ bm[x.t] = x.c; });
+  const f = fx.length ? fx[fx.length-1].c : 0; if(!(f>0)) return [];
+  return up.reverse().filter(x=>bm[x.t]>0).map(x=>({t:x.t,c:(x.c/(bm[x.t]*f)-1)*100}));
+}
+async function loadWm(k){
+  const sc = WSRC[k]; let s = null;
+  try{
+    if(sc.bn){ try{ s = await serBn(sc.bn,60); }catch(e){} if(!sOK(s)) s = await serHl(sc.hl); }
+    else if(sc.hl) s = await serHl(sc.hl);
+    else if(sc.yf) s = (await serYf(sc.yf)).slice(-60);
+    else if(sc.kimp) s = (await serKimp()).slice(-60);
+  }catch(e){ s = null; }
+  if(sOK(s)){ WM[k] = s.map(x=>x.c); drawMon(); }
+}
+const WM_FAST = ['BTC','XYZ100','SPCX'], WM_SLOW = Object.keys(WSRC).filter(k=>WM_FAST.indexOf(k)<0);
+function loadWmAll(list,force){ if(document.hidden && !force) return; list.forEach(k=>loadWm(k)); }
 function drawMon(){
   $('monG').innerHTML = ORDER.map(k=>{
     const x = MON[k] || (k==='KOSPI' && MON['KOSPI 야간']) || {};
@@ -215,8 +275,9 @@ function drawMon(){
     const c = x.c, has = typeof c==='number';
     const cls = !has?'na':c>0?'up':c<0?'dn':'flat';
     const sign = !has?'':c>0?'+':c<0?'−':'';
-    return '<div class="mon-k '+cls+'"><div class="mon-t">'+esc(label)+'</div><div class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</div>'+
-      '<div class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</div></div>';
+    const wm = wmSvg(k);
+    return '<div class="mon-k '+cls+(wm?' wmk':'')+'">'+(wm?'<div class="mon-tx">':'')+'<div class="mon-t">'+esc(label)+'</div><div class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</div>'+
+      '<div class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</div>'+(wm?'</div>'+wm:'')+'</div>';
   }).join('');
 }
 function loadMon(){
@@ -256,6 +317,7 @@ async function loadSpcx(){
   }catch(e){}
 }
 drawMon(); loadMon(); loadXyz(); loadSpcx();
+loadWmAll(WM_FAST,1); loadWmAll(WM_SLOW,1); document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadWmAll(WM_FAST); loadWmAll(WM_SLOW); } }); setInterval(()=>loadWmAll(WM_FAST), 30000); setInterval(()=>loadWmAll(WM_SLOW), 120000);
 setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 15000);
 
 /* ---------- B-3 뉴스 (코인속보 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
