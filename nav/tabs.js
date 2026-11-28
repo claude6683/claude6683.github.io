@@ -4,18 +4,18 @@
   window.__tabs6683 = 1;
   var H = 42, KEY = '6683-tabs-order';
   var TABS = [
-    ['/dashboard/', 'Dashboard','Dash'],
-    ['/fractal-chart/', 'fractal-chart','Fractal'],
-    ['/overview/', 'overview','Overview'],
-    ['/smc/', 'SMC','SMC'],
-    ['/ai/', 'AI 자동매매','AI'],
-    ['/fishing/', 'Fishing','Fish'],
-    ['/divergence/', 'INDEX','INDEX'],
-    ['/xyz100/', 'NASDAQ LIVE','NQ LIVE'],
-    ['/kospi/', 'KOSPI LIVE','KS LIVE'],
-    ['/nasdaq-alert/', 'NASDAQ ALERT','NQ ALERT'],
-    ['/kospi-alert/', 'KOSPI ALERT','KS ALERT'],
-    ['/live/', 'Live Show','Live']
+    ['/dashboard/', 'Main','Main'],
+    ['/fractal-chart/', 'F.chart','F.chart'],
+    ['/overview/', 'O.View','O.View'],
+    ['/smc/', 'Chart','Chart'],
+    ['/ai/', 'AI','AI'],
+    ['/fishing/', 'Fish','Fish'],
+    ['/divergence/', 'Index','Index'],
+    ['/xyz100/', 'N.Live','N.Live'],
+    ['/kospi/', 'K.Live','K.Live'],
+    ['/nasdaq-alert/', 'N.Alert','N.Alert'],
+    ['/kospi-alert/', 'K.Alert','K.Alert'],
+    ['/live/', 'T.View','T.View']
   ];
   var path = location.pathname.replace(/\/index\.html$/, '/');
   var page = ''; // 페이지별 겹침 보정용 이름

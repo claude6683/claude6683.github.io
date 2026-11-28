@@ -24,7 +24,10 @@
   .info{font-size:13px;color:var(--sub);margin-left:6px}
   .up{color:var(--up)} .dn{color:var(--dn)}
   #chartbox{position:relative}
-  #chart{height:calc(100vh - 300px);min-height:380px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #chart{height:calc(100vh - 300px);min-height:250px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #rsz{height:14px;margin-top:2px;cursor:ns-resize;touch-action:none;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+  #rsz:before{content:"";width:60px;height:4px;border-radius:2px;background:var(--line)}
+  #rsz:hover:before,#rsz.on:before{background:#f2b84b}
   #tip{position:absolute;display:none;pointer-events:none;z-index:5;background:rgba(24,27,34,.95);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:12px;line-height:1.7;white-space:nowrap}
   #tip .tt{color:var(--sub);margin-bottom:3px}
   #tip .k{color:var(--sub);display:inline-block;min-width:62px}
@@ -89,6 +92,7 @@ table.cmp tr[data-a]{cursor:pointer}
     <span class="lbl" id="cnote"></span>
   </div>
   <div id="chartbox"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div></div>
+  <div id="rsz" title="위아래로 끌어서 차트 높이 조절 (더블클릭: 기본 높이)"></div>
   <div id="msg"></div>
   <div id="aipanel">
     <div class="pcard"><h3>종목별 모의계좌 <span class="sub" id="cmpnote"></span></h3><div style="overflow-x:auto"><table class="cmp" id="cmp"></table></div></div>
@@ -168,6 +172,17 @@ const cs = chart.addCandlestickSeries({
 });
 function fit(){ chart.resize($('chart').clientWidth, $('chart').clientHeight); sizeCv(); }
 window.addEventListener('resize', fit);
+// 차트 높이 조절 (아래 핸들 위아래 드래그, 더블클릭=기본값, 높이는 이 브라우저에 저장)
+(function(){
+  const el=$('chart'), h=$('rsz'), K='ai-chart-h'; let sy=0, sh=0, on=false;
+  const clamp=v=>Math.max(250, Math.min(2000, v));
+  try{ const v=parseInt(localStorage.getItem(K),10); if(v) el.style.height=clamp(v)+'px'; }catch(e){}
+  h.addEventListener('pointerdown',e=>{ on=true; sy=e.clientY; sh=el.clientHeight; h.classList.add('on'); try{h.setPointerCapture(e.pointerId);}catch(_){} e.preventDefault(); });
+  h.addEventListener('pointermove',e=>{ if(!on) return; el.style.height=clamp(sh+e.clientY-sy)+'px'; fit(); });
+  const end=()=>{ if(!on) return; on=false; h.classList.remove('on'); try{ localStorage.setItem(K,String(el.clientHeight)); }catch(e){} };
+  h.addEventListener('pointerup',end); h.addEventListener('pointercancel',end);
+  h.addEventListener('dblclick',()=>{ el.style.height=''; try{ localStorage.removeItem(K); }catch(e){} fit(); });
+})();
 
 // ---------- data ----------
 async function fetchBinance(symb, c){
@@ -694,6 +709,6 @@ buildUI(); fit(); load();
 window.__smc = {get bars(){return bars;}, get smc(){return smc;}, chart, cs, ts, on, redraw, get cross(){return cross;}};
 })();
 </script>
-<script src="/nav/tabs.js?v=7"></script>
+<script src="/nav/tabs.js?v=8"></script>
 </body>
 </html>
