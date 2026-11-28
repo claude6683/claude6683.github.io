@@ -35,7 +35,25 @@
   .row .pr{border-radius:4px;transition:background .6s}
 
   /* 차트 */
-  #chartView{display:none;flex-direction:column;min-width:0;flex:1}
+  #chartArea{display:none;flex:1;min-width:0;min-height:0}
+  #chartView{display:flex;flex-direction:column;min-width:0;min-height:0;flex:1}
+  #pane2{display:none;border:0;flex:1;min-width:0;min-height:0;width:100%;height:100%;background:var(--bg)}
+  #chartArea.l2v{flex-direction:row} #chartArea.l2h{flex-direction:column}
+  #chartArea.l2v #pane2,#chartArea.l2h #pane2{display:block}
+  #chartArea.l2v #chartView{border-right:2px solid #2f3747}
+  #chartArea.l2h #chartView{border-bottom:2px solid #2f3747}
+  .cbar select{font-size:.8rem;font-family:inherit;color:inherit;background:#1d2330;border:1px solid var(--line);border-radius:6px;padding:3px 6px;max-width:10rem}
+  #psym{display:none}
+  body.pane #psym{display:inline-block} body.pane #ctitle,body.pane #back,body.pane .fsx,body.pane .fsm,body.pane .fsp,body.pane #layBtn,body.pane #layPop,body.pane #cnote{display:none!important}
+  body.pane #listView{display:none!important} body.pane #chartArea{display:flex!important}
+  #layBtn{padding:2px 8px;line-height:0;margin-left:6px}
+  #layPop{display:none;position:fixed;z-index:50;background:#1b1f27;border:1px solid #3a4254;border-radius:8px;padding:8px 10px;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #layPop.open{display:block}
+  #layPop .lr{display:flex;align-items:center;gap:10px;margin:3px 0}
+  #layPop .ln{width:1rem;color:var(--sub);font-size:.75rem;text-align:center}
+  #layPop button{padding:5px 9px;line-height:0;background:transparent;border-color:transparent;color:#cfd5e3}
+  #layPop button.on{background:#1f3a3a;border-color:#3d7c7c}
+  #layBtn svg,#layPop svg{pointer-events:none}
   .cbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap;flex:none}
   .cbar .tt{font-weight:700;font-size:1rem}
   .cbar .cp{font-variant-numeric:tabular-nums;font-size:1rem}
@@ -71,7 +89,7 @@
   #addRes .sr{display:block;width:100%;text-align:left;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--tx)}
   .row .pr{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   body.wide #listView{display:none!important}
-  body.wide #chartView{display:flex}
+  body.wide #chartArea{display:flex}
   body.wide #back{display:none!important}
 
   /* SMC 지표·그리기 도구 줄 */
@@ -86,12 +104,12 @@
 
   /* 모바일: 목록 → 차트 전환 */
   body.chart #listView{display:none}
-  body.chart #chartView{display:flex}
+  body.chart #chartArea{display:flex}
   body.chart #back{display:inline-block}
   /* 넓은 화면: 목록 + 차트 나란히 */
   @media(min-width:640px){
     #listView{width:24rem;max-width:calc(100vw - 12rem);flex:none}
-    #chartView{display:flex}
+    #chartArea{display:flex}
     body.chart #listView{display:flex}
     #back{display:none!important}
   }
@@ -107,9 +125,11 @@
     <div id="rows"></div>
     <div id="restore"></div>
   </section>
+  <div id="chartArea">
   <section id="chartView">
     <div class="cbar">
       <button id="back">‹ 목록</button>
+      <select id="psym" title="종목 선택"></select>
       <span class="tt" id="ctitle">—</span>
       <span class="cp" id="cprice"></span>
       <span class="sp"></span>
@@ -121,11 +141,14 @@
       <div class="tools"></div>
     </div>
     <div class="sbar" id="smcbar"><span class="lbl">SMC</span><button id="smcM">표시</button><div class="grp" id="smcopts"></div><span class="lbl">스윙길이</span><select id="swl"><option>10</option><option>20</option><option>50</option><option>100</option></select><span class="lbl">모드</span><div class="grp" id="smode"><button data-sm="hist">과거전체</button><button data-sm="pres">현재만</button></div></div>
-    <div class="sbar" id="drawbar"><span class="lbl">그리기</span><div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button></div></div>
+    <div class="sbar" id="drawbar"><span class="lbl">그리기</span><div class="grp" id="dtools"><button data-d="trend">추세선</button><button data-d="hline">수평선</button><button data-d="vline">수직선</button><button data-d="fib">피보나치</button><button data-d="rect">사각형</button><button data-d="measure" title="재기 (자)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" style="vertical-align:-2px;margin-right:3px;pointer-events:none"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></svg>재기</button><button data-d="erase">지우개</button><button id="undo">되돌리기</button><button id="clr">전체삭제</button><button id="layBtn" title="차트 분할 (1개 / 2개)"></button></div></div>
     <div id="cwrap"><div id="chart"></div><canvas id="draw"></canvas><div id="tip"></div><div id="lastp"></div><div id="cmsg"></div></div>
     <div id="cnote">기준 = 오늘 종가(차트를 불러온 시점의 마지막 봉 종가) · ±% = (가격 − 종가) ÷ 종가 × 100 · 휠/핀치 확대, 드래그 이동, 가격축 위아래 드래그 = 세로 확대·축소, 더블클릭 초기화 · 상승 빨강 / 하락 파랑<br>SMC 지표: "Smart Money Concepts [LuxAlgo]" © LuxAlgo (CC BY-NC-SA 4.0)를 JavaScript로 옮긴 비상업적 학습용 버전입니다. 원본과 100% 같지 않을 수 있으며 투자 권유가 아닙니다.</div>
   </section>
+  <iframe id="pane2" title="두 번째 차트" loading="lazy"></iframe>
+  </div>
 </div>
+<div id="layPop"></div>
 
 <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
 <script src="./smc-engine.js"></script>
@@ -173,6 +196,8 @@ const BY = Object.create(null); SYMS.forEach(s=>BY[s.id]=s);
 const st = Object.create(null);          // id -> {p, pc, t(ms)}
 const feedAt = {bn:0, up:0, hl:0, yf:0, bp:0};
 const $ = id => document.getElementById(id);
+const PANE = /[?&]pane=/.test(location.search);   // 두 번째 차트(iframe)로 열렸을 때: 목록·탭바 없이 차트만, 설정은 별도 저장
+if(PANE) document.body.classList.add('pane');
 
 // ---- 공통 ----
 const fmt = (s,v)=> v==null||!isFinite(v) ? '—' : v.toLocaleString('en-US',{minimumFractionDigits:s.dec,maximumFractionDigits:s.dec});
@@ -297,6 +322,7 @@ function applyFS(){
   try{ localStorage.setItem(FK, String(fs)); }catch(e){}
 }
 function changeFS(d){ fs = Math.min(28, Math.max(11, fs+d)); applyFS(); }
+window.addEventListener('storage', e=>{ if(PANE && e.key===FK){ const v=+e.newValue; if(v>=11 && v<=28 && v!==fs){ fs=v; applyFS(); } } });   // 글자 크기: 메인 변경을 두 번째 차트에 반영
 const fsEl = ()=>document.fullscreenElement||document.webkitFullscreenElement;
 function toggleFull(){
   const d=document, e=d.documentElement;
@@ -602,7 +628,7 @@ function updateHead(){
 }
 
 // ---- SMC 지표 + 그리기 도구 (claude6683.github.io/smc 와 같은 엔진·도구, 색은 Live 규칙: 상승 빨강 / 하락 파랑) ----
-const SK = 'live-smc-v1', DK = 'live-draw-v1';
+const SK = PANE?'live-smc-v1-p2':'live-smc-v1', DK = PANE?'live-draw-v1-p2':'live-draw-v1';
 const SOPTS = [
   ['internal','내부구조',1],['swing','스윙구조',1],['iob','내부OB',1],['sob','스윙OB',0],
   ['eq','EQH/EQL',1],['hl','강/약 고저',1],['fvg','FVG',0],
@@ -886,16 +912,57 @@ function route(){
   if(id && BY[id] && rowEl[id] && !hidden.has(id)){
     if(curId!==id){ bars=[]; byTime=new Map(); if(series) series.setData([]); $('cprice').textContent=''; smcReset(); }
     curId = id; if(rowEl[id]) rowEl[id].classList.add('sel'); document.body.classList.add('chart');
+    if(PANE){ $('psym').value = id; try{ localStorage.setItem(P2K, id); }catch(e){} }
     $('ctitle').textContent = (BY[id]&&BY[id].label)||id; updateHead();
     if(!chart) initChart();
     loadChart(false);
   }else{
     document.body.classList.remove('chart'); curId = null;
-    if(matchMedia('(min-width:640px)').matches){ const f = SYMS.length && Array.from($('rows').children).find(r=>!r.classList.contains('gone')); if(f){ history.replaceState(null,'','#'+f.dataset.id); route(); } }
+    if(PANE || matchMedia('(min-width:640px)').matches){ const f = SYMS.length && Array.from($('rows').children).find(r=>!r.classList.contains('gone')); if(f){ history.replaceState(null,'','#'+f.dataset.id); route(); } }
   }
+}
+// ---- 차트 분할 (1개 / 좌우 2개 / 상하 2개): 두 번째 차트는 같은 페이지를 ?pane=2 로 불러와 종목·시간대·SMC·그리기가 따로 동작 ----
+const LAYK = 'live-lay-v1', P2K = 'live-pane2-sym';
+let lay = '1';
+try{ const v = localStorage.getItem(LAYK); if(v==='2v'||v==='2h') lay = v; }catch(e){}
+const ICO = (extra)=>'<svg width="22" height="16" viewBox="0 0 22 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="20" height="14" rx="2"/>'+(extra||'')+'</svg>';
+const LAYICON = {'1':ICO(), '2v':ICO('<path d="M11 1v14"/>'), '2h':ICO('<path d="M1 8h20"/>')};
+const visIds = ()=>Array.from($('rows').children).filter(r=>!r.classList.contains('gone')).map(r=>r.dataset.id);
+function pickPane2Sym(){
+  let v = ''; try{ v = localStorage.getItem(P2K)||''; }catch(e){}
+  const ids = visIds();
+  if(v && BY[v] && ids.indexOf(v)>=0) return v;
+  return ids.find(i=>i!==curId) || curId || ids[0] || '';
+}
+function applyLay(){
+  const ca = $('chartArea'), f = $('pane2');
+  ca.classList.toggle('l2v', lay==='2v'); ca.classList.toggle('l2h', lay==='2h');
+  if(lay==='1'){ if(f.dataset.on==='1'){ f.dataset.on='0'; f.src='about:blank'; } }
+  else if(f.dataset.on!=='1'){ f.dataset.on='1'; f.src = './?pane=2#'+encodeURIComponent(pickPane2Sym()); }
+  $('layBtn').innerHTML = LAYICON[lay];
+  document.querySelectorAll('#layPop button').forEach(b=>b.classList.toggle('on', b.dataset.l===lay));
+}
+function buildLay(){
+  const pop = $('layPop');
+  pop.innerHTML = '<div class="lr"><span class="ln">1</span><button data-l="1" title="차트 1개">'+LAYICON['1']+'</button></div>'
+    + '<div class="lr"><span class="ln">2</span><button data-l="2v" title="좌우 2개">'+LAYICON['2v']+'</button><button data-l="2h" title="상하 2개">'+LAYICON['2h']+'</button></div>';
+  $('layBtn').onclick = e=>{
+    e.stopPropagation();
+    if(pop.classList.toggle('open')){ const r = $('layBtn').getBoundingClientRect(); pop.style.top = (r.bottom+6)+'px'; pop.style.left = Math.max(4, Math.min(r.left, innerWidth-pop.offsetWidth-8))+'px'; }
+  };
+  pop.addEventListener('click', e=>{ const b = e.target.closest('button[data-l]'); if(!b) return; lay = b.dataset.l; try{ localStorage.setItem(LAYK, lay); }catch(_){} pop.classList.remove('open'); applyLay(); });
+  document.addEventListener('click', e=>{ if(!e.target.closest('#layPop,#layBtn')) pop.classList.remove('open'); });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape') pop.classList.remove('open'); });
+  applyLay();
+}
+function buildPaneSel(){
+  const sel = $('psym'); sel.innerHTML = '';
+  visIds().forEach(id=>{ const o = document.createElement('option'); o.value = id; o.textContent = BY[id].label||id; sel.appendChild(o); });
+  sel.onchange = ()=>{ location.hash = '#'+sel.value; };
 }
 function buildUI(){
   buildRows(); buildTools(); buildAdd(); buildSMC();
+  if(PANE) buildPaneSel(); else buildLay();
   const g = $('tfs');
   TFS.forEach(([k,l])=>{ const b=document.createElement('button'); b.textContent=l; b.dataset.tf=k; if(k===tf) b.className='on';
     b.onclick=()=>{ tf=k; g.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.tf===k)); bars=[]; byTime=new Map(); smc=null; view=null; if(series) series.setData([]); redraw(); loadChart(false); }; g.appendChild(b); });
@@ -916,6 +983,6 @@ setInterval(()=>{ if(curId) loadChart(true); }, 300000);   // 5분마다 봉 전
 route();
 })();
 </script>
-<script src="/nav/tabs.js?v=9"></script>
+<script>if(!/[?&]pane=/.test(location.search)){var ts=document.createElement('script');ts.src='/nav/tabs.js?v=9';document.body.appendChild(ts);}</script>
 </body>
 </html>
