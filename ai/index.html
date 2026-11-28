@@ -227,7 +227,7 @@ async function load(){
     if(id!==loadId) return;
     bars = clean(rows); barsSym = a.k;
     if(!bars.length){
-      cs.setData([]); smc=null; redraw();
+      cs.setData([]); smc=null; redraw(); barsSym=''; applyAI();
       $('msg').textContent = a.src==='st' ? '주식 데이터 준비 중입니다 (서버 첫 갱신 대기, 최대 15분). BTC·GOLD는 바로 볼 수 있습니다.' : '데이터가 없습니다.';
       $('legendInfo').textContent=''; return;
     }
@@ -653,18 +653,19 @@ function renderPanel(){
   if(cnt){ const tr=(tot/(s0*cnt)-1)*100; h+=`<tr><td><b>전체 평균</b></td><td>${money(tot)}</td><td class="${cls(tr)}"><b>${sgn(tr)}</b></td><td colspan="6" class="sub" style="text-align:left">종목당 ${money(s0)} × ${cnt}개 계좌</td></tr>`; }
   cmp.innerHTML=h;
   const m0=(ai.syms||{})[sym];
-  $('cmpnote').textContent=m0?'· '+sym+' 시작 '+kstStr(m0.startT)+' (KST) · 마지막 판단 봉 '+kstStr(m0.lastT):'';
+  const stale=ai.updated&&(Date.now()/1000-num(ai.updated))>2700;
+  $('cmpnote').textContent=(m0?'· '+sym+' 시작 '+kstStr(m0.startT)+' (KST) · 마지막 판단 봉 '+kstStr(m0.lastT):'')+(stale?' · ⚠ 서버 갱신이 45분 넘게 멈춰 있어요(마지막 '+kstStr(ai.updated)+')':'');
   const a=ai.accounts[sym];
   if(!a){ $('nowhd').textContent='· '+sym; $('now').textContent='이 종목은 아직 계좌가 시작되지 않았어요(봉 데이터 부족이거나 다음 실행 대기).'; $('posbox').textContent=''; $('log').innerHTML=''; $('logn').textContent=''; drawEq(); return; }
   const st=a.status||{}, act=esc(st.action||'HOLD'), px=pxOf(sym);
   $('nowhd').textContent='· '+sym+' · '+(st.t?kstStr(st.t)+' 봉 기준':'');
-  $('now').innerHTML=`<span class="badge b-${act}">${({BUY:'BUY (매수)',SELL:'SELL (매도)',HOLD:'HOLD (관망)',HOLDING:'보유 중'})[st.action]||act}</span>`+esc(st.text||'');
+  $('now').innerHTML=`<span class="badge b-${act}">${({BUY:'BUY (매수)',SELL:'SELL (매도)',HOLD:'HOLD (관망)',HOLDING:'보유 중'})[act]||act}</span>`+esc(st.text||'');
   const p=a.pos;
   $('posbox').innerHTML=p?`<b>보유:</b> ${p.side==='L'?'롱':'숏'} ${num(p.qty).toFixed(4)} · 진입 ${fmtV(num(p.entry))} · 손절 ${fmtV(num(p.stop))} · 목표 ${fmtV(num(p.target))} · 미실현 <b class="${cls((px-num(p.entry))*(p.side==='L'?1:-1))}">${money((px-num(p.entry))*num(p.qty)*(p.side==='L'?1:-1))}</b>`:'<b>보유:</b> 없음 · '+esc(a.desc||'');
   const evs=(a.events||[]).slice().reverse().slice(0,60);
   $('logn').textContent='· '+sym+' · 최근 '+evs.length+'건';
   $('log').innerHTML=evs.length?evs.map(ev=>{
-    const t=esc(ev.type), lab=({BUY:'BUY 롱 진입',SELL:'SELL 숏 진입',CLOSE:'청산'})[ev.type]||t;
+    const t=esc(ev.type), lab=({BUY:'BUY 롱 진입',SELL:'SELL 숏 진입',CLOSE:'청산'})[t]||t;
     const extra=ev.type==='CLOSE'?` · 손익 <b class="${cls(num(ev.pnl))}">${money(num(ev.pnl))}</b> (${esc(ev.why)})`:(ev.stop?` · 손절 ${fmtV(num(ev.stop))} / 목표 ${fmtV(num(ev.target))}`:'');
     return `<div class="ev"><div class="hd"><span class="badge b-${t}">${lab}</span>${kstStr(ev.t)} (KST) · 가격 ${fmtV(num(ev.price))}${extra}</div><div class="why">${esc(ev.reason)}</div></div>`;
   }).join(''):'<div class="sub">아직 매매 기록이 없습니다. 조건이 맞을 때만 진입하므로 관망이 길 수 있어요.</div>';

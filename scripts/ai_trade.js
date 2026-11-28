@@ -203,7 +203,7 @@ async function runSymbol(st, c, nowS) {
   const bars = (await fetchBars(c)).filter(b => b.t + TF_SEC <= nowS).sort((a, b) => a.t - b.t);
   if (bars.length < MIN_BARS) { console.log(c.k, 'skip: bars', bars.length); return; }
   const lastIdx = bars.length - 1;
-  if (!st.accounts[c.k]) {
+  if (!st.accounts[c.k] || !st.syms[c.k]) {   // 계좌나 syms 중 하나라도 없으면 새로 시작
     const s0 = bars[lastIdx - 1];
     st.accounts[c.k] = newAcct(c.k, c.k, c.desc); st.accounts[c.k].curve.push([s0.t, START_EQUITY]);
     st.syms[c.k] = { startT: s0.t, startPrice: s0.c, lastT: s0.t, px: [[s0.t, s0.c]] };
