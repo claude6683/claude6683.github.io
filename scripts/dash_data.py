@@ -1,4 +1,4 @@
-"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(코인속보 4·미증시 3·한국증시 3·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
+"""Dashboard 용 데이터: 12종목 52주 최저가(종가 기준) + 뉴스(Flow 속보 4·미증시 3·한국증시 3·코인 3)를 dash.json 으로 저장 (GitHub Actions)."""
 import datetime
 import json
 import time
@@ -41,11 +41,50 @@ def lows():
 
 
 NEWS = [  # (분류, 검색어, 개수)
-    ("코인속보", "이더리움 OR 리플 OR 솔라나 OR 알트코인 OR 코인 속보", 4),
     ("미증시", "(뉴욕증시 OR 나스닥 OR 미국증시) -비트코인 -코인 -이더리움 -가상자산", 3),
     ("한국증시", "코스피 OR 코스닥", 3),
     ("코인", "비트코인 OR 가상자산", 3),
 ]
+
+
+def flow_news(n=4):
+    """Followin 텔레그램 공개 채널(t.me/s/followin_ko)의 최신 헤드라인 n건. 링크는 쓰지 않는다."""
+    import html
+    import re
+    raw, last = None, None
+    for k in range(3):
+        try:
+            raw = urllib.request.urlopen(urllib.request.Request("https://t.me/s/followin_ko", headers=UA), timeout=30).read().decode("utf-8", "replace")
+            break
+        except Exception as e:
+            last = e
+            time.sleep(2 * (k + 1))
+    if raw is None:
+        print("flow news fail", last)
+        return []
+    rows, seen = [], set()
+    for blk in raw.split('tgme_widget_message_wrap')[1:]:
+        m = re.search(r'<div class="tgme_widget_message_text[^"]*"[^>]*>(.*?)</div>', blk, re.S)
+        tm = re.search(r'<time[^>]*datetime="([^"]+)"', blk)
+        if not m or not tm:
+            continue
+        txt = html.unescape(re.sub(r"<[^>]+>", "", re.sub(r"<br\s*/?>", "\n", m.group(1))))
+        lines = [x.strip() for x in txt.split("\n") if x.strip()]
+        if not lines:
+            continue
+        t = lines[0]
+        if len(t) > 140:
+            t = t[:139] + "…"
+        try:
+            at = int(datetime.datetime.fromisoformat(tm.group(1)).timestamp())
+        except Exception:
+            continue
+        if t in seen:
+            continue
+        seen.add(t)
+        rows.append({"cat": "Flow 속보", "at": at, "t": t, "src": "Followin", "l": ""})
+    rows.sort(key=lambda r: -r["at"])
+    return rows[:n]
 
 
 def save_news(n=4):
@@ -71,7 +110,7 @@ def save_news(n=4):
 
 
 def news():
-    items = []
+    items = flow_news(4)
     for cat, q, n in NEWS:
         u = "https://news.google.com/rss/search?" + urllib.parse.urlencode(
             {"q": q + " when:1d", "hl": "ko", "gl": "KR", "ceid": "KR:ko"})

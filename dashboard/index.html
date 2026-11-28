@@ -42,14 +42,14 @@
   /* B-1 시세 전광판 (Monitor 복사) */
   #c-mon .cb{background:#0b0d10;padding:12px;overflow:auto}
   .mon-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;height:100%}
-  .mon-k{border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:90px;
+  .mon-k{border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px;min-height:90px;padding:14px 4px 0;
          background:linear-gradient(160deg,#262a31 0%,#181b20 55%,#121418 100%);
          box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -4px 0 rgba(0,0,0,.45),0 6px 14px rgba(0,0,0,.5);border:1px solid #2a2f37}
   /* 전광판 종목별 1분봉(최근 1시간) 워터마크: 위 글자 / 아래 라인 */
   .mon-k{position:relative;overflow:hidden}
   .mon-k>*{position:relative;z-index:1}
   .mon-k.wmk{justify-content:flex-start;gap:0}
-  .mon-tx{height:52%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+  .mon-tx{min-height:52%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:4px}
   .mon-k>.wm{position:absolute;left:0;right:0;bottom:0;width:100%;height:46%;z-index:0;pointer-events:none}
   /* 상단 줄: 전광판(정사각형) + 뉴스(남는 자리) */
   .c2{grid-template-columns:min(58%,960px) minmax(0,1fr)}
@@ -61,6 +61,9 @@
   .mon-v{font-size:calc(clamp(12px,1.35vw,18px) * var(--ms,1));font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
   .mon-p{font-size:calc(clamp(13px,1.5vw,20px) * var(--ms,1));font-weight:700;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:3px}
   .mon-s{min-width:.6em;text-align:center}
+  /* 가격 + 등락률 한 줄, 글자 크기는 종목명(.mon-t)과 같음. 아주 좁으면 자동 줄바꿈 */
+  .mon-r{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:center;column-gap:.6em;font-size:calc(clamp(14px,1.7vw,24px) * var(--ms,1))}
+  .mon-r .mon-v,.mon-r .mon-p{font-size:inherit;white-space:nowrap}
   .mon-k.up{color:var(--up);text-shadow:0 0 10px rgba(62,224,143,.35)}
   .mon-k.dn{color:var(--dn);text-shadow:0 0 10px rgba(255,95,95,.35)}
   .mon-k.flat,.mon-k.na{color:#9aa1ad}
@@ -134,7 +137,7 @@
         <div class="cb"><div class="mon-g" id="monG"></div></div>
       </div>
       <div class="cell" id="c-news">
-        <div class="ch"><span>News<small>코인속보 4 · 미증시 3 · 한국증시 3 · 코인 3</small></span><button class="xb">⤢</button></div>
+        <div class="ch"><span>News<small>Flow 속보 4 · 미증시 3 · 한국증시 3 · 코인 3</small></span><button class="xb">⤢</button></div>
         <div class="cb"><div class="pane" id="nw" style="height:100%"></div></div>
       </div>
     </div>
@@ -278,8 +281,8 @@ function drawMon(){
     const cls = !has?'na':c>0?'up':c<0?'dn':'flat';
     const sign = !has?'':c>0?'+':c<0?'−':'';
     const wm = wmSvg(k);
-    return '<div class="mon-k '+cls+(wm?' wmk':'')+'">'+(wm?'<div class="mon-tx">':'')+'<div class="mon-t">'+esc(label)+'</div><div class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</div>'+
-      '<div class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</div>'+(wm?'</div>'+wm:'')+'</div>';
+    return '<div class="mon-k '+cls+(wm?' wmk':'')+'">'+(wm?'<div class="mon-tx">':'')+'<div class="mon-t">'+esc(label)+'</div><div class="mon-r"><span class="mon-v">'+monPrice(k==='KOSPI'?label:k,x.p)+'</span>'+
+      '<span class="mon-p"><span class="mon-s">'+sign+'</span>'+(has?Math.abs(c*100).toFixed(2)+'%':'—')+'</span></div>'+(wm?'</div>'+wm:'')+'</div>';
   }).join('');
 }
 function loadMon(){
@@ -322,9 +325,9 @@ drawMon(); loadMon(); loadXyz(); loadSpcx();
 loadWmAll(WM_FAST,1); loadWmAll(WM_SLOW,1); document.addEventListener('visibilitychange',()=>{ if(!document.hidden){ loadWmAll(WM_FAST); loadWmAll(WM_SLOW); } }); setInterval(()=>loadWmAll(WM_FAST), 30000); setInterval(()=>loadWmAll(WM_SLOW), 120000);
 setInterval(loadMon, 20000); setInterval(loadXyz, 5000); setInterval(loadSpcx, 15000);
 
-/* ---------- B-3 뉴스 (코인속보 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
-const CATC = {'코인속보':['#fff0d9','#cc7300'],'Save':['#ffe9ef','#d6336c'],'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
-const NEWS_N = {'코인속보':4,'미증시':3,'한국증시':3,'코인':3};
+/* ---------- B-3 뉴스 (Flow 속보 4 · 미증시 3 · 한국증시 3 · 코인 3) ---------- */
+const CATC = {'Flow 속보':['#e6f4ff','#0b6fb8'],'Save':['#ffe9ef','#d6336c'],'미증시':['#e8f0ff','#2661d9'],'한국증시':['#e6f7eb','#1a8c4d'],'코인':['#fff0d9','#cc7300']};
+const NEWS_N = {'Flow 속보':4,'미증시':3,'한국증시':3,'코인':3};
 const SAVE_URL = '';   // Cloudflare Worker 주소 (worker/save-proxy.js 배포 후 입력)
 let NEWS = null, LOWS = {}, SHEET = null, SAVEN = [];
 async function loadSave(){
@@ -332,7 +335,7 @@ async function loadSave(){
   try{
     const j = await (await fetch(SAVE_URL, {cache:'no-store'})).json();
     SAVEN = (j.news||[]).slice(0,4);
-    NEWS = (NEWS||[]).filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['코인속보','Save','미증시','한국증시','코인'].indexOf(a.cat)-['코인속보','Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
+    NEWS = (NEWS||[]).filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['Flow 속보','Save','미증시','한국증시','코인'].indexOf(a.cat)-['Flow 속보','Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
     drawNews();
   }catch(e){}
 }
@@ -345,7 +348,7 @@ function drawNews(){
     const day = p2(d.getUTCMonth()+1)+'-'+p2(d.getUTCDate()), tm = p2(d.getUTCHours())+':'+p2(d.getUTCMinutes());
     let h = ''; if(day!==last){ h += '<div style="font-size:12px;color:var(--sub);font-weight:700;padding:6px 0 2px">'+day+'</div>'; last = day; }
     return h + '<div class="it nw"><div class="row2"><span class="tm">'+tm+'</span><span class="chip" style="background:'+c[0]+';color:'+c[1]+'">'+esc(n.cat)+'</span>'+
-      '<a class="ttl" style="color:var(--tx);text-decoration:none" href="'+esc(safeUrl(n.l))+'" target="_blank" rel="noopener">'+esc(n.t)+'</a></div>'+
+      (n.l?'<a class="ttl" style="color:var(--tx);text-decoration:none" href="'+esc(safeUrl(n.l))+'" target="_blank" rel="noopener">'+esc(n.t)+'</a>':'<span class="ttl">'+esc(n.t)+'</span>')+'</div>'+
       (n.src?'<div style="margin:2px 0 0 46px;font-size:11px;color:var(--sub)">'+esc(n.src)+'</div>':'')+'</div>';
   }).join('');
 }
@@ -382,13 +385,13 @@ async function loadDash(){
     const r = await fetch(DASH_URL+'?t='+Math.floor(Date.now()/60000), {cache:'no-store'});
     if(!r.ok) throw new Error(r.status);
     const j = await r.json(); LOWS = j.lows||{};
-    const order = ['코인속보','Save','미증시','한국증시','코인'];
+    const order = ['Flow 속보','Save','미증시','한국증시','코인'];
     drawSp(j.spcx);
-    NEWS = (j.news||[]).slice().sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat) || b.at-a.at);
+    NEWS = (j.news||[]).filter(n=>n.cat!=='코인속보').sort((a,b)=>order.indexOf(a.cat)-order.indexOf(b.cat) || b.at-a.at);
     if(!NEWS.length) NEWS = null;
   }catch(e){ NEWS = null; }
   if(!NEWS) NEWS = newsFromSheet();
-  if(SAVEN.length) NEWS = NEWS.filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['코인속보','Save','미증시','한국증시','코인'].indexOf(a.cat)-['코인속보','Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
+  if(SAVEN.length) NEWS = NEWS.filter(n=>n.cat!=='Save').concat(SAVEN).sort((a,b)=>['Flow 속보','Save','미증시','한국증시','코인'].indexOf(a.cat)-['Flow 속보','Save','미증시','한국증시','코인'].indexOf(b.cat) || b.at-a.at);
   drawNews(); drawTable();
 }
 
