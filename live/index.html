@@ -935,8 +935,7 @@ function pickPane2Sym(){
   return ids.find(i=>i!==curId) || curId || ids[0] || '';
 }
 function applyLay(){
-  const ca = $('chartArea'), f = $('pane2'), wide = matchMedia('(min-width:640px)').matches, eff = wide ? lay : '1';   // 폭 640px 미만(폰)에서는 분할 안 함
-  $('layBtn').style.display = wide ? '' : 'none';
+  const ca = $('chartArea'), f = $('pane2'), eff = lay;   // 창 폭과 상관없이 고른 분할 유지
   ca.classList.toggle('l2v', eff==='2v'); ca.classList.toggle('l2h', eff==='2h');
   if(eff==='1'){ if(f.dataset.on==='1'){ f.dataset.on='0'; f.src='about:blank'; } }
   else if(f.dataset.on!=='1'){ f.dataset.on='1'; f.src = './?pane=2#'+encodeURIComponent(pickPane2Sym()); }
@@ -955,7 +954,6 @@ function buildLay(){
   document.addEventListener('click', e=>{ if(!e.target.closest('#layPop,#layBtn')) pop.classList.remove('open'); });
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') pop.classList.remove('open'); });
   applyLay();
-  try{ matchMedia('(min-width:640px)').addEventListener('change', applyLay); }catch(e){}
 }
 function buildPaneSel(){
   const sel = $('psym'); sel.innerHTML = '';
