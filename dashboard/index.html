@@ -55,7 +55,7 @@
   .c2{grid-template-columns:min(58%,960px) minmax(0,1fr)}
   #c-mon{aspect-ratio:1/1}
   #c-news{contain:size}
-  .row.max #c-mon{aspect-ratio:auto}
+  .row.max #c-mon,#c-mon.max{aspect-ratio:auto}
   .row.max .c2{height:calc(100vh - 60px)}
   .mon-t{font-size:calc(clamp(14px,1.7vw,24px) * var(--ms,1));font-weight:800;letter-spacing:.5px}
   .mon-v{font-size:calc(clamp(12px,1.35vw,18px) * var(--ms,1));font-weight:600;color:#d7dbe2;font-variant-numeric:tabular-nums}
@@ -108,6 +108,8 @@
     .c3{grid-template-columns:1fr;height:auto}
     .c2{grid-template-columns:1fr}
     #c-news{contain:none;height:420px}
+    #c-news.max{height:auto}
+    .row.max #c-news{height:auto;min-height:380px}
     #c-mon{aspect-ratio:auto}
     #c-mon .mon-g{height:auto}
     #c-mon .mon-k{min-height:128px}
